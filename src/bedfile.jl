@@ -48,3 +48,20 @@ function Statistics.mean(f::BEDFile; dims)
     end
     means
 end
+
+"""
+    missingpos(f::BEDFile)
+
+Return a `SparseMatrixCSC` of the same size as `f` indicating the positions with missing data
+"""
+function missingpos(f::BEDFile)
+    m, n = size(f)
+    colptr = sizehint!(Int32[1], n)
+    rowval = Int32[]
+    for j in 1:n
+        msngpos = findall(isone.(BEDColumn(f, j)))
+        append!(rowval, msngpos)
+        push!(colptr, colptr[end] + length(msngpos))
+    end
+    SparseMatrixCSC(m, n, colptr, rowval, ones(Int8, length(rowval)))
+end

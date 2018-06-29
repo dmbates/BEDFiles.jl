@@ -1,11 +1,11 @@
 __precompile__()
 
 module BEDFiles
-    using Missings, Mmap, OffsetArrays, Statistics, StatsBase
+    using Missings, Mmap, OffsetArrays, SparseArrays, Statistics, StatsBase
     import Base: IndexStyle, eltype, getindex, length, size
     import Statistics: mean
     import StatsBase: counts
-    export BEDFile, BEDColumn, bedvals, columncounts, counts, mean
+    export BEDFile, BEDColumn, bedvals, columncounts, counts, mean, missingpos
     
     include("bedfile.jl")
     include("bedcolumn.jl")
