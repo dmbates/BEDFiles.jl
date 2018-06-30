@@ -143,8 +143,8 @@ julia> @time extrema(bf1221);
 ```
 
 A more practical example is to find all the positions in this column with missing values.
-Recall that a 1 indicates a missing value.
-```
+Recall that `0x01` indicates a missing value.
+```julia
 julia> findall(isone.(bf1221))
 3-element Array{Int64,1}:
   676
@@ -155,7 +155,7 @@ julia> @time findall(isone.(bf1221));
   0.000060 seconds (10 allocations: 4.906 KiB)
 ```
 To break this down, the `isone` function applied to a number returns a `Bool`.
-```
+```julia
 julia> isone(2)
 false
 
@@ -178,7 +178,7 @@ In some operations on GWAS data the data are converted to counts of the second a
 This is accomplished by indexing `bedvals` with the column returning a vector of type
 `Union{Missing,UInt8}` which is the preferred way in v0.7 of representing possibly data
 vectors that may contain missing values.
-```
+```julia
 julia> bedvals[bf1221]
 1940-element Array{Union{Missing, UInt8},1}:
  0x01
@@ -203,12 +203,12 @@ julia> bedvals[bf1221]
 
 ```
 The mean for each column in this representation is returned by
-```
+```julia
 julia> mean(bf, dims=1)
 1×10150 Array{Float64,2}:
  1.113  1.11237  1.28099  1.11203  …  1.8009  1.79966  1.79955  1.79943
 ```
-This could be done by applying `mean(skipmissing(col))` to each column
+This could be done by applying `mean(skipmissing(col))` to each column.
 ```julia
 
 ## Location of the missing values
