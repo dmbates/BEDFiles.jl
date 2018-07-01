@@ -12,7 +12,7 @@ The table contains the observed allelic type at `n`
 [*single-nucleotide polymorphism*](https://en.wikipedia.org/wiki/Single-nucleotide_polymorphism) (SNP) positions 
 for `m` individuals.
 
-A SNP is a position of a nucleotide in the genome where some degree of variation has been observed in a population,
+A SNP corresponds to a nucleotide position on the genome where some degree of variation has been observed in a population,
 with each individual have one of two possible *alleles* at that position on each of a pair of chromosomes.
 Three possible types can be observed are:
 homozygous allele 1, coded as `0x00`, heterzygous, coded as `0x10`, and homozygous allele 2, coded as `0x11`.
