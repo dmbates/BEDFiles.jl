@@ -4,15 +4,15 @@ Routines for reading and manipulating GWAS data in .bed files
 Data from [*Genome-wide association studies*](https://en.wikipedia.org/wiki/Genome-wide_association_study)
 are often saved as a [**PLINK binary biallelic genotype table**](https://www.cog-genomics.org/plink2/formats#bed)
 or `.bed` file.
-To be useful, such files should be accompanied by a `.fam` file, containing metadata on the rows of the table, and `.bim` file,
+To be useful, such files should be accompanied by a `.fam` file, containing metadata on the rows of the table, and a `.bim` file,
 containing metadata on the columns.
-The `.fam` and `.bim` files in tab-separated format.
+The `.fam` and `.bim` files are in tab-separated format.
 
 The table contains the observed allelic type at `n`
 [*single-nucleotide polymorphism*](https://en.wikipedia.org/wiki/Single-nucleotide_polymorphism) (SNP) positions 
 for `m` individuals.
 
-A SNP is a position in the genomoe of a nucleotide where some degree of variation has been observed in a population,
+A SNP is a position of a nucleotide in the genome where some degree of variation has been observed in a population,
 with each individual have one of two possible *alleles* at that position on each of a pair of chromosomes.
 Three possible types can be observed are:
 homozygous allele 1, coded as `0x00`, heterzygous, coded as `0x10`, and homozygous allele 2, coded as `0x11`.
@@ -260,8 +260,8 @@ The `countcols` method and other column-oriented operations are performed in par
 ## Instantiating as a count of the second allele
 
 In some operations on GWAS data the data are converted to counts of the second allele.
-This is accomplished by indexing `bedvals` with the column returning a vector of type
-`Union{Missing,UInt8}`, which is the preferred way in v0.7 of representing possibly data
+This is accomplished by indexing `bedvals` with the `BEDColumn`, returning a vector of type
+`Union{Missing,UInt8}`, which is the preferred way in v0.7 of representing data
 vectors that may contain missing values.
 ```julia
 julia> bedvals[bf1221]
@@ -362,7 +362,7 @@ julia> mean(bf, dims=1)
 
 ## Location of the missing values
 
-Some operations subsetting the rows to only those with complete data.
+Some operations require subsetting the rows to only those with complete data.
 Discovering whichrows do not have any missing data could be done by iterating across the rows but it is
 generally faster to iterate over columns.
 
