@@ -20,13 +20,18 @@ end
 Base.IndexStyle(::Type{BEDColumn}) = IndexLinear()
 
 StatsBase.counts(c::BEDColumn) = counts!(Vector{Int}(undef, 4), c)
-
+#=
 function Base.iterate(c::BEDColumn, (i, b)=(1, 0x00))
     i ≤ c.m || return nothing
     ip3 = i + 3
-    s = (ip3 & 0x03) << 1 # == 2*rem(ip3, 4) - the size of the bitshift
-    iszero(s) && @inbounds(b = c.data[ip3 >> 2])
-    (b >> s) & 0x03, (i + 1, b)
+    iszero(ip3 & 0x03) && @inbounds(b = c.data[ip3 >> 2])
+    (b & 0x03), (i + 1, b >> 2)
+end    
+=#
+function Base.iterate(c::BEDColumn, i=1)
+    i ≤ c.m || return nothing
+    ip3 = i + 3
+    @inbounds((c.data[ip3 >> 2] >> ((ip3 & 0x03) << 1)) & 0x03), i + 1
 end    
 
 Base.length(c::BEDColumn) = c.m

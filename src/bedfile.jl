@@ -11,7 +11,7 @@ end
 function BEDFile(bednm::AbstractString, m::Integer)
     data = open(bednm, "r") do io
         read(io, UInt16) == 0x1b6c || throw(ArgumentError("wrong magic number in file $bednm"))
-        isone(read(io, UInt8)) || throw(ArgumentError(".bed file, $bednm, is not in correct orientation"))
+        read(io, UInt8) == 0x01 || throw(ArgumentError(".bed file, $bednm, is not in correct orientation"))
         Mmap.mmap(io, Vector{UInt8})
     end
     drows = (m + 3) >> 2   # the number of rows in the Matrix{UInt8}
