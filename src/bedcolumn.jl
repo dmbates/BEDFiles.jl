@@ -28,17 +28,18 @@ function Base.iterate(c::BEDColumn, (i, b)=(1, 0x00))
     (b & 0x03), (i + 1, b >> 2)
 end    
 =#
-function Base.iterate(c::BEDColumn, i=1)
-    i ≤ c.m || return nothing
+Base.iterate(c::BEDColumn, i=1) = i > c.m ? nothing : begin
     ip3 = i + 3
     @inbounds((c.data[ip3 >> 2] >> ((ip3 & 0x03) << 1)) & 0x03), i + 1
-end    
+end
 
 Base.length(c::BEDColumn) = c.m
 
 Base.eltype(::Type{BEDColumn}) = UInt8
 
 Base.size(c::BEDColumn) = (c.m,)
+
+
 
 """
     sumnnmiss(c::BEDColumn)
@@ -64,25 +65,11 @@ function Statistics.mean(c::BEDColumn)
     s / nnmiss
 end
 
-
-"""
-outer!(pr::Matrix{Union{Missing,Int}}, c::BEDColumn)
-
-Return `pr + c*c'`
-"""
-function outer!(pr::Matrix{Union{Missing,Int}}, c::BEDColumn)
-    j = 0
-    for v in c
-        prj = view(pr, :, j += 1)
-        if ismissing(v)
-            fill!(prj, missing)
-        elseif isone(v)
-            @. prj += c
-        elseif !iszero(v)
-            @. prj += v * c
-        end
+function Base.copyto!(v::AbstractVector{T}, c::BEDColumn) where T <: AbstractFloat
+    for (i, x) in enumerate(c)
+        v[i] = iszero(x) ? zero(T) : isone(x) ? T(NaN) : x - 1
     end
-    pr
+    v
 end
 
 """

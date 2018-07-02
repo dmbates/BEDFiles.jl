@@ -12,7 +12,7 @@ function BEDFile(bednm::AbstractString, m::Integer)
     data = open(bednm, "r") do io
         read(io, UInt16) == 0x1b6c || throw(ArgumentError("wrong magic number in file $bednm"))
         read(io, UInt8) == 0x01 || throw(ArgumentError(".bed file, $bednm, is not in correct orientation"))
-        Mmap.mmap(io, Vector{UInt8})
+        Mmap.mmap(io)
     end
     drows = (m + 3) >> 2   # the number of rows in the Matrix{UInt8}
     n, r = divrem(length(data), drows)
@@ -37,6 +37,35 @@ end
 
 Base.getindex(g::BEDFile, i::Integer, j::Integer) = BEDColumn(g, j)[i]
 
+"""
+    outer(f::BEDFile, colinds)
+    outer(f::BEDFile)
+
+Return the "outer product", `f * f'` using the `Float32[0, NaN, 1, 2]` encoding of `f`
+
+The `colinds` argument, when given, causes the operation to be performed on that subset
+of the columns.
+"""
+function outer(f::BEDFile, colinds::AbstractVector{<:Integer})
+    m, n = size(f)
+    outer!(Symmetric(zeros(Float32, (m,m))), f, colinds)
+end
+outer(f::BEDFile) = outer(f, 1:size(f)[2])
+
+"""
+    outer!(sy::Symmetric, f::BEDFile, colinds)
+
+update `sy` with the sum of the outer products of the columns in `colind` from `f`
+"""
+function outer!(sy::Symmetric{T}, f::BEDFile, colinds::AbstractVector{<:Integer}) where T <: AbstractFloat
+    m, n = size(f)
+    tempv = Vector{T}(undef, m)
+    for j in colinds
+        LinearAlgebra.BLAS.syr!(sy.uplo, 1.0f0, copyto!(tempv, BEDColumn(f, j)), sy.data)
+    end
+    sy
+end
+
 Base.size(f::BEDFile) = f.m, size(f.data, 2)
 
 function Statistics.mean(f::BEDFile; dims)
@@ -44,7 +73,7 @@ function Statistics.mean(f::BEDFile; dims)
     isone(dims) || throw(ArgumentError("mean(f::BEDFile; dims) only defined for dims = 1"))
     means = Matrix{Float64}(undef, (1, n))
     Threads.@threads for j in 1:n
-        means[j] = mean(BEDColumn(f, j))
+        @inbounds means[j] = mean(BEDColumn(f, j))
     end
     means
 end
