@@ -38,6 +38,10 @@ function colcounts!(counts, f::BEDFile)
     counts
 end    
 
+function Base.getindex(f::BEDFile, i::Int)  # Linear indexing
+    d, r = divrem(i, f.m)
+    f[r + 1, d + 1]
+end
 function Base.getindex(f::BEDFile, i::Integer, j::Integer)
     ip3 = i + 3
     (f.data[ip3 >> 2, j] >> ((ip3 & 0x03) << 1)) & 0x03
@@ -46,8 +50,6 @@ end
 Base.eltype(f::BEDFile) = UInt8
 
 Base.length(f::BEDFile) = f.m * size(f.data, 2)
-
-Base.IndexStyle(::Type{BEDFile}) = CartesianIndex()
 
 Base.size(f::BEDFile) = f.m, size(f.data, 2)
 

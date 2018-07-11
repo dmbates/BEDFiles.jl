@@ -15,7 +15,7 @@ module BEDFiles
 
 `Vector{Union{UInt8,Missings.Missing}}` of the possible values in a BEDFile
 """
-    const bedvals = OffsetArray{Union{UInt8,Missing}}(undef, 0:3)
+    const bedvals = OffsetArray{Union{Int8,Missing}}(undef, 0:3)
     bedvals[0] = 0
     bedvals[2] = 1
     bedvals[3] = 2

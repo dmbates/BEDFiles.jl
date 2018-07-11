@@ -79,7 +79,7 @@ If omitted, `m` is determined as the number of lines in the `.fam` file.
 Because the file is memory-mapped this operation is fast, even for very large `.bed` files.
 ```julia
 julia> @time BEDFile("./data/mouse/alldata.bed");
-  0.000339 seconds (48 allocations: 10.500 KiB)
+  0.000316 seconds (48 allocations: 10.500 KiB)
 ```
 
 This file, from a study published in 2006, is about 5 Mb in size but data from recent studies, which have samples from tens of
@@ -103,117 +103,45 @@ and 577 are homozygous allele 2 (`A`).
 
 This operation also is reasonably fast
 ```julia
-julia> Threads.nthreads()
-1
-
-julia> @benchmark columncounts($bf);
+julia> @benchmark columncounts(bf)
 BenchmarkTools.Trial: 
-  memory estimate:  1.55 MiB
-  allocs estimate:  30453
+  memory estimate:  317.27 KiB
+  allocs estimate:  2
   --------------
-  minimum time:     241.850 ms (0.00% GC)
-  median time:      242.658 ms (0.00% GC)
-  mean time:        243.114 ms (0.20% GC)
-  maximum time:     253.099 ms (4.09% GC)
+  minimum time:     37.682 ms (0.00% GC)
+  median time:      38.371 ms (0.00% GC)
+  mean time:        38.479 ms (0.19% GC)
+  maximum time:     47.893 ms (19.91% GC)
   --------------
-  samples:          21
-  evals/sample:     1
-```
-Furthermore, `columncounts` can take advantage of multiple threads of execution.
-Restarting julia after setting `JULIA_NUM_THREADS = 4` gives 
-```julia
-julia> using Pkg, BenchmarkTools, BEDFiles
-
-julia> Threads.nthreads()
-4
-
-julia> @benchmark columncounts(bf) setup=(bf = BEDFile(Pkg.dir("BEDFiles", "data", "mouse", "alldata.bed")))
-BenchmarkTools.Trial: 
-  memory estimate:  1.54 MiB
-  allocs estimate:  30138
-  --------------
-  minimum time:     64.220 ms (0.00% GC)
-  median time:      64.299 ms (0.00% GC)
-  mean time:        64.336 ms (0.00% GC)
-  maximum time:     64.750 ms (0.00% GC)
-  --------------
-  samples:          78
+  samples:          130
   evals/sample:     1
 ```
 
-## Column-wise operations
+In some applications the data are converted to counts of the second allele
+|BEDFile|count   |
+|------:|--------:|
+| 0x00  | 0       |
+| 0x01  | missing |
+| 0x10  | 1       |
+| 0x11  | 2       |
 
-The `BEDColumn` type represents a column of the data and provides efficient access to the data, especially when used as an *iterator*.
-
-For example the `columncounts` method
+The column means, skipping missing data, are returned by
 ```julia
-function columncounts(f::BEDFile)
-    m, n = size(f)
-    counts = Matrix{Int}(undef, (4, n))
-    Threads.@threads for j in 1:n
-        counts!(view(counts, :, j), BEDColumn(f, j))
-    end
-    counts
-end
-```
-calls `counts!` on each column of `f` passing a view of the corresponding column of the `counts` to be overwritten in
-```julia
-function counts!(counts::AbstractVector{<:Integer}, c::BEDColumn)
-    length(counts) ≥ 4 || throw(ArgumentError("length(counts) = $(length(counts)) should be at least 4"))
-    fill!(counts, 0)
-    for v in c
-        @inbounds counts[v + 1] += 1
-    end
-    counts
-end
-```
+julia> mean(bf, dims=1)
+1×10150 Array{Float64,2}:
+ 1.113  1.11237  1.28099  1.11203  1.7376  1.11191  …  1.79966  1.8009  1.79966  1.79955  1.79943
 
-The *iterator* expression, `for v in c`, produces the values in the range `0x00` to `0x03` in sequence directly from the
-read-only array of packed values.
-
-The magic of [fused vectorized operations](https://docs.julialang.org/en/latest/manual/performance-tips/#More-dots:-Fuse-vectorized-operations-1) and the iterator optimizations in v0.7 generally provide the fastest way to operate on a column.
-```julia
-julia> BEDColumn(bf, 1221)
-1940-element BEDColumn:
- 0x02
- 0x02
- 0x02
- 0x02
- 0x03
-    ⋮
- 0x03
- 0x03
- 0x03
- 0x02
- 0x03
-```
-Although it appears that the column has been expanded to 1940 `UInt8` values,
-the column is in fact just a one-dimensional view of the column of the compressed memory-mapped array in `bf`.
-```julia
-julia> typeof(bf1221.data)
-SubArray{UInt8,1,Array{UInt8,2},Tuple{Base.Slice{Base.OneTo{Int64}},Int64},true}
-
-julia> length(bf1221.data)
-485
-```
-
-In addition there is a fast way of iterating over the 1940 values in the GWAS array.
-As a trivial example
-```julia
-julia> extrema(bf1221)  # the minimum and maximum values in the column
-(0x00, 0x03)
-
-julia> @benchmark extrema(bf1221) setup=(bf1221 = BEDColumn(bf, 1221))
+julia> @benchmark mean(bf, dims=1)
 BenchmarkTools.Trial: 
-  memory estimate:  0 bytes
-  allocs estimate:  0
+  memory estimate:  79.39 KiB
+  allocs estimate:  2
   --------------
-  minimum time:     20.012 μs (0.00% GC)
-  median time:      20.031 μs (0.00% GC)
-  mean time:        20.050 μs (0.00% GC)
-  maximum time:     43.664 μs (0.00% GC)
+  minimum time:     57.535 ms (0.00% GC)
+  median time:      57.712 ms (0.00% GC)
+  mean time:        57.901 ms (0.00% GC)
+  maximum time:     59.440 ms (0.00% GC)
   --------------
-  samples:          10000
+  samples:          87
   evals/sample:     1
 ```
 
