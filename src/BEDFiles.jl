@@ -3,9 +3,9 @@ __precompile__()
 module BEDFiles
     using LinearAlgebra, Missings, Mmap, OffsetArrays, SparseArrays, Statistics, StatsBase
     import Base: IndexStyle, convert, copyto!, eltype, getindex, length, size
-    import Statistics: mean
+    import Statistics: mean, std, var
     import StatsBase: counts
-    export BEDFile, BEDColumn, bedvals, columncounts, counts, mean, missingpos, outer, outer!
+    export BEDFile, BEDColumn, bedvals, columncounts, mean, missingpos, rowcounts
     
     include("bedfile.jl")
     include("bedcolumn.jl")
@@ -19,5 +19,7 @@ module BEDFiles
     bedvals[0] = 0
     bedvals[2] = 1
     bedvals[3] = 2
+
+    datadir(parts...) = joinpath(@__DIR__, "..", "data", parts...)
 
 end # module
