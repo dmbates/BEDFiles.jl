@@ -1,6 +1,10 @@
 # BEDFiles.jl
 Routines for reading and manipulating GWAS data in .bed files
 
+| **Documentation**                                                               | **PackageEvaluator**                                            | **Build Status**                                                                                |
+|:-------------------------------------------------------------------------------:|:---------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
+| [![][docs-stable-img]][docs-stable-url] [![][docs-latest-img]][docs-latest-url] | [![][pkg-0.7-img]][pkg-0.7-url] | [![][travis-img]][travis-url] [![][appveyor-img]][appveyor-url] [![][coveralls-img]][coveralls-url] |
+
 Data from [*Genome-wide association studies*](https://en.wikipedia.org/wiki/Genome-wide_association_study)
 are often saved as a [**PLINK binary biallelic genotype table**](https://www.cog-genomics.org/plink2/formats#bed)
 or `.bed` file.
@@ -365,3 +369,24 @@ julia> findall(iszero, msngpos * ones(Int, size(msngpos, 2)))'  # rows with no m
 julia> @time findall(iszero, msngpos * ones(Int, size(msngpos, 2)))';
   0.000128 seconds (22 allocations: 103.422 KiB)
 ```
+
+
+[docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
+[docs-latest-url]: https://dmbates.github.io/BEDFiles.jl/latest
+
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://dmbates.github.io/BEDFiles.jl/stable
+
+[travis-img]: https://travis-ci.org/dmbates/BEDFiles.jl.svg?branch=master
+[travis-url]: https://travis-ci.org/dmbates/BEDFiles.jl
+
+[appveyor-img]: https://ci.appveyor.com/api/projects/status/bifqhte27nekp97m/branch/master?svg=true
+[appveyor-url]: https://ci.appveyor.com/project/dmbates/mixedmodels-jl/branch/master
+
+[coveralls-img]: https://coveralls.io/repos/github/dmbates/BEDFiles.jl/badge.svg?branch=master
+[coveralls-url]: https://coveralls.io/github/dmbates/BEDFiles.jl?branch=master
+
+[issues-url]: https://github.com/dmbates/BEDFiles.jl/issues
+
+[pkg-0.7-img]: http://pkg.julialang.org/badges/BEDFiles_0.7.svg
+[pkg-0.7-url]: http://pkg.julialang.org/?pkg=BEDFiles
