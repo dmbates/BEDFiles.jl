@@ -380,7 +380,7 @@ julia> @time findall(iszero, msngpos * ones(Int, size(msngpos, 2)))';
 [travis-img]: https://travis-ci.org/dmbates/BEDFiles.jl.svg?branch=master
 [travis-url]: https://travis-ci.org/dmbates/BEDFiles.jl
 
-[appveyor-img]: https://ci.appveyor.com/api/projects/status/bifqhte27nekp97m/branch/master?svg=true
+[appveyor-img]: https://ci.appveyor.com/api/projects/status/lr3tqmbam8sw6714/branch/master?svg=true
 [appveyor-url]: https://ci.appveyor.com/project/dmbates/mixedmodels-jl/branch/master
 
 [coveralls-img]: https://coveralls.io/repos/github/dmbates/BEDFiles.jl/badge.svg?branch=master
