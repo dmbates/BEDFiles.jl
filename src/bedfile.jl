@@ -107,18 +107,27 @@ Statistics.var(f::BEDFile; corrected::Bool=true, mean=nothing, dims=:) = _var(f,
 
 function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
     m, n = size(f)
-    mean = something(mean, Statistics.mean(f, dims=dims))
+    means = something(mean, Statistics.mean(f, dims=dims))
     if isone(dims)
-        cc = columncounts(f)
+        cc = _counts(f, 1)
         vars = Matrix{Float64}(undef, (1, n))
         for j in 1:n
-            mnj = mean[j]
+            mnj = means[j]
             vars[j] = (abs2(mnj)*cc[1,j] + abs2(1.0 - mnj)*cc[3,j] + abs2(2.0 - mnj)*cc[4,j]) /
                 (cc[1,j] + cc[3,j] + cc[4,j] - (corrected ? 1 : 0))
         end
         return vars
+    elseif dims == 2
+        rc = _counts(f, 2)
+        vars = Matrix{Float64}(undef, (m, 1))
+        for i in 1:m
+            mni = means[i]
+            vars[i] = (abs2(mni)*rc[1,i] + abs2(1.0 - mni)*rc[3,i] + abs2(2.0 - mni)*rc[4,i]) /
+                (rc[1,i] + rc[3,i] + rc[4,i] - (corrected ? 1 : 0))
+        end
+        return vars
     end
-    throw(ArgumentError("var(f::BEDFile, dims=k) only defined for k = 1"))
+    throw(ArgumentError("var(f::BEDFile, dims=k) only defined for k = 1 or 2"))
 end
 
 """    
@@ -160,16 +169,19 @@ end
 """
     missingpos(f::BEDFile)
 
-Return a `SparseMatrixCSC` of the same size as `f` indicating the positions with missing data
+Return a `SparseMatrixCSC{Bool,Int32}` of the same size as `f` indicating the positions with missing data
 """
 function missingpos(f::BEDFile)
     m, n = size(f)
-    colptr = sizehint!(Int32[1], n)
+    colptr = sizehint!(Int32[1], n + 1)
     rowval = Int32[]
     @inbounds for j in 1:n
-        msngpos = findall(isone.(f[i, j] for i in 1:m))
+        msngpos = Int32[]
+        for i in 1:m
+            isone(f[i, j]) && push!(msngpos, i)
+        end
         append!(rowval, msngpos)
         push!(colptr, colptr[end] + length(msngpos))
     end
-    SparseMatrixCSC(m, n, colptr, rowval, ones(Int8, length(rowval)))
+    SparseMatrixCSC(m, n, colptr, rowval, fill(true, length(rowval)))
 end
