@@ -9,12 +9,12 @@ const EUR = BEDFile(BEDFiles.datadir("EUR_subset.bed"))
 end
 
 @testset "counts" begin
-    cc = columncounts(EUR)
+    cc = counts(EUR, dims=1)
     @test size(cc) == (4, size(EUR, 2))
     @test view(cc, :, 1) == [2, 0, 70, 307]
     @test all(sum(cc, dims = 1) .== size(EUR, 1))
     @test all(iszero, view(cc, 2, :))
-    rc = rowcounts(EUR)
+    rc = counts(EUR, dims=2)
     @test size(rc) == (4, size(EUR, 1))
     @test view(rc, :, 1) == [2997, 0, 13143, 37911]
     @test all(sum(rc, dims = 1) .== size(EUR, 2))

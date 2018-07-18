@@ -23,28 +23,37 @@ function BEDFile(bednm::AbstractString, m::Integer)
 end
 BEDFile(nm::AbstractString) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")))
 
-"""
-    columncounts(f::BEDFile)
+StatsBase.counts(f::BEDFile; dims=:) = _counts(f, dims)
 
-Return a matrix of frequency counts for the columns of `f`.
-
-The `4×size(f, 2)` matrix is the `columncounts` field of `f`, initialized
-to zeros.  The first time `columncounts(f)` is called on `f` the counts are
-evaluated.  Subsequent calls are very fast because they simply return this
-previously evaluated result. 
-"""
-function columncounts(f::BEDFile)
-    cc = f.columncounts
-    if all(iszero, cc)
-        m, n = size(f)
-        @inbounds for j in 1:n
-            for i in 1:m
-                cc[f[i, j] + 1, j] += 1            
+function _counts(f::BEDFile, dims::Integer)
+    if isone(dims)
+        cc = f.columncounts
+        if all(iszero, cc)
+            m, n = size(f)
+            @inbounds for j in 1:n
+                for i in 1:m
+                    cc[f[i, j] + 1, j] += 1            
+                end
             end
         end
+        return cc
+    elseif dims == 2
+        rc = f.rowcounts
+        if all(iszero, rc)
+            m, n = size(f)
+            @inbounds for j in 1:n
+                for i in 1:m
+                    rc[f[i, j] + 1, i] += 1            
+                end
+            end
+        end
+        return rc
+    else
+        throw(ArgumentError("counts(f::BEDFile, dims=k) only defined for k = 1 or 2"))
     end
-    cc
 end
+
+_counts(f::BEDFile, ::Colon) = sum(_counts(f, 1), dims=2)
 
 function Base.getindex(f::BEDFile, i::Int)  # Linear indexing
     d, r = divrem(i - 1, f.m)
@@ -66,14 +75,14 @@ Statistics.mean(f::BEDFile; dims=:) = _mean(f, dims)
 function _mean(f::BEDFile,  dims::Integer)
     m, n = size(f)
     if isone(dims)
-        cc = columncounts(f)   # need to use extractor to force evaluation if needed
+        cc = _counts(f, 1)   # need to use extractor to force evaluation if needed
         means = Matrix{Float64}(undef, (1, n))
         @inbounds for j in 1:n
             means[j] = (cc[3, j] + 2*cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j])
         end
         return means
     elseif dims == 2
-        rc = rowcounts(f)
+        rc = _counts(f, 2)
         means = Matrix{Float64}(undef, (m, 1))
         @inbounds for i in 1:m
             means[i] = (rc[3, i] + 2*rc[4, i]) / (rc[1, i] + rc[3, i] + rc[4, i])
@@ -85,31 +94,8 @@ function _mean(f::BEDFile,  dims::Integer)
 end
 
 function _mean(f::BEDFile, ::Colon)
-    rc = rowcounts(f)
+    rc = _counts(f, 2)
     (sum(view(rc, 3, :)) + 2*sum(view(rc, 4, :))) / sum(view(rc, [1, 3, 4], :))
-end
-
-"""
-    rowcounts(f::BEDFile)
-
-Return a matrix of frequency counts from the rows of `f`.
-
-The `4×size(f, 1)` matrix is the `rowcounts` field of `f`, initialized
-to zeros.  The first time `rowcounts` is called on `f` the counts are
-evaluated.  Subsequent calls are very fast because they simply return this
-previously evaluated result. 
-"""
-function rowcounts(f::BEDFile)
-    rc = f.rowcounts
-    if all(iszero, rc)
-        m, n = size(f)
-        @inbounds for j in 1:n
-            for i in 1:m
-                rc[f[i, j] + 1, i] += 1            
-            end
-        end
-    end
-    rc
 end
 
 Base.size(f::BEDFile) = f.m, size(f.data, 2)
