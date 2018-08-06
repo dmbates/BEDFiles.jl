@@ -73,7 +73,7 @@ julia> size(bf.data) # the actual size of the memory-mapped matrix of UInt8s
 As described above, a column, consisting of `m` values in the range `0x00` to `0x03`, is packed into `div(m + 3, 4)` bytes.
 
 (The calculation `div(i + 3, 4)` or `(i + 3) ÷ 4` occurs in some important loops in the code where it is evaluated via the
-equivalent, but somewhat faster, expression `(i + 3) >> 2` which uses bit shifts to accomplish the division by 4.)
+equivalent, but somewhat faster, expression `(i + 3) >> 2`, which uses bit-shifting to accomplish the division by 4.)
 
 The virtual number of rows, `m`, can be given as a second argument in the call to `BEDFile`.
 If omitted, `m` is determined as the number of lines in the `.fam` file. 
