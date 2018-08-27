@@ -27,7 +27,7 @@ array of `div(m + 3, 4)` bytes (`UInt8` values).
 
 ## Installation
 
-This package requires Julia v0.7.0-beta or later, which can be obtained from
+This package requires Julia v0.7.0 or later, which can be obtained from
 https://julialang.org/downloads/ or by building Julia from the sources in the
 https://github.com/JuliaLang/julia repository.
 
@@ -60,8 +60,8 @@ Please see the documentation [![][docs-latest-img]][docs-latest-url] for usage.
 [travis-img]: https://travis-ci.org/dmbates/BEDFiles.jl.svg?branch=master
 [travis-url]: https://travis-ci.org/dmbates/BEDFiles.jl
 
-[appveyor-img]: https://ci.appveyor.com/api/projects/status/lr3tqmbam8sw6714/branch/master?svg=true
-[appveyor-url]: https://ci.appveyor.com/project/dmbates/mixedmodels-jl/branch/master
+[appveyor-img]: https://ci.appveyor.com/api/projects/status/bifqhte27nekp97m?svg=true
+[appveyor-url]: https://ci.appveyor.com/project/dmbates/bedfiles-jl/branch/master
 
 [coveralls-img]: https://coveralls.io/repos/github/dmbates/BEDFiles.jl/badge.svg?branch=master
 [coveralls-url]: https://coveralls.io/github/dmbates/BEDFiles.jl?branch=master

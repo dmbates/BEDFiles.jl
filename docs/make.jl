@@ -8,7 +8,7 @@ makedocs(
 deploydocs(
     repo   = "github.com/dmbates/BEDFiles.jl.git",
     target = "build",
-    julia  = "nightly",
+    julia  = "1.0",
     deps   = nothing,
     make   = nothing
 )
