@@ -16,7 +16,7 @@ for `m` individuals.
 
 A SNP corresponds to a nucleotide position on the genome where some degree of variation has been observed in a population,
 with each individual have one of two possible *alleles* at that position on each of a pair of chromosomes.
-Three possible types can be observed are:
+The three possible types that can be observed are:
 homozygous allele 1, coded as `0x00`, heterzygous, coded as `0x10`, and homozygous allele 2, coded as `0x11`.
 Missing values are coded as `0x01`.
 
@@ -25,7 +25,7 @@ array of `div(m + 3, 4)` bytes (`UInt8` values).
 
 ## Installation
 
-This package requires Julia v0.7.0-beta or later, which can be obtained from
+This package requires Julia v0.7.0 or later, which can be obtained from
 https://julialang.org/downloads/ or by building Julia from the sources in the
 https://github.com/JuliaLang/julia repository.
 
@@ -54,6 +54,7 @@ along with `m`, the number of individuals.
 ```@docs
 BEDFile
 ```
+For convenience, two `Int` matrices, `columncounts` and `rowcounts` are allocated but not populated until used.
 
 The columns correspond to SNP positions.
 Rows of the internal matrix are packed values from groups of 4 individuals.
