@@ -2,6 +2,7 @@ name = "BEDFiles"
 uuid = "6f44c9a6-7b0d-11e8-3270-d5b481c31be2"
 authors = ["Douglas Bates <dmbates@gmail.com>"]
 version = "0.1.0"
+keywords = ["GWAS", "Genome-wide association studies", "binary plink"]
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -16,5 +17,8 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsBase = ">=0.11.0"
 OffsetArrays = ">=0.8.0"
 
-[target.test.deps]
+[extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
