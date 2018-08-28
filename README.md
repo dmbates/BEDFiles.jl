@@ -3,7 +3,7 @@ Routines for reading and manipulating GWAS data in .bed files
 
 | **Documentation**                                                               | **PackageEvaluator**                                            | **Build Status**                                                                                |
 |:-------------------------------------------------------------------------------:|:---------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
-| [![][docs-stable-img]][docs-stable-url] [![][docs-latest-img]][docs-latest-url] | [![][pkg-0.7-img]][pkg-0.7-url] | [![][travis-img]][travis-url] [![][appveyor-img]][appveyor-url] [![][coveralls-img]][coveralls-url] |
+| [![][docs-stable-img]][docs-stable-url] [![][docs-latest-img]][docs-latest-url] | [![][pkg-0.7-img]][pkg-0.7-url] | [![][travis-img]][travis-url] [![][appveyor-img]][appveyor-url] [![][coveralls-img]][coveralls-url] [![][codecov-img]][codecov-url]|
 
 Data from [*Genome-wide association studies*](https://en.wikipedia.org/wiki/Genome-wide_association_study)
 are often saved as a [**PLINK binary biallelic genotype table**](https://www.cog-genomics.org/plink2/formats#bed)
@@ -65,6 +65,9 @@ Please see the documentation [![][docs-latest-img]][docs-latest-url] for usage.
 
 [coveralls-img]: https://coveralls.io/repos/github/dmbates/BEDFiles.jl/badge.svg?branch=master
 [coveralls-url]: https://coveralls.io/github/dmbates/BEDFiles.jl?branch=master
+
+[codecov-img]: https://codecov.io/github/dmbates/BEDFiles.jl/badge.svg?branch=master
+[codecov-url]: https://codecov.io/github/dmbates/BEDFiles.jl?branch=master
 
 [issues-url]: https://github.com/dmbates/BEDFiles.jl/issues
 
