@@ -15,7 +15,7 @@ git:
 
 after_script:  # TODO: change to after_success once https://github.com/JuliaLang/julia/issues/28306 is fixed
   # push coverage results to Codecov
-  - julia -e 'using Pkg, BEDFiles; cd(joinpath(dirname(pathof(BedFiles)), "..")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'using Pkg, BEDFiles; cd(joinpath(dirname(pathof(BEDFiles)), "..")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
   # Update the documentation
   - julia -e 'using Pkg; Pkg.add("Documenter")'
   - julia -e 'using BEDFiles; ENV["DOCUMENTER_DEBUG"] = "true"; include(joinpath(dirname(pathof(BEDFiles)), "..", "docs", "make.jl"))'
