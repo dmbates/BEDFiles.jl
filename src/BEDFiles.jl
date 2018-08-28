@@ -8,7 +8,6 @@ module BEDFiles
     export BEDFile, bedvals, counts, mean, missingpos, std, var
     
     include("bedfile.jl")
-    include("bedcolumn.jl")
 
 """
     BEDvals

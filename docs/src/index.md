@@ -26,8 +26,8 @@ array of `div(m + 3, 4)` bytes (`UInt8` values).
 ## Installation
 
 This package requires Julia v0.7.0 or later, which can be obtained from
-https://julialang.org/downloads/ or by building Julia from the sources in the
-https://github.com/JuliaLang/julia repository.
+<https://julialang.org/downloads/> or by building Julia from the sources in the
+<https://github.com/JuliaLang/julia> repository.
 
 The package has not yet been registered and must be installed using the repository location.
 Start julia and use the `]` key to switch to the package manager REPL
@@ -73,8 +73,9 @@ julia> size(bf.data) # the actual size of the memory-mapped matrix of UInt8s
 
 As described above, a column, consisting of `m` values in the range `0x00` to `0x03`, is packed into `div(m + 3, 4)` bytes.
 
-(The calculation `div(i + 3, 4)` or `(i + 3) ÷ 4` occurs in some important loops in the code where it is evaluated via the
-equivalent, but somewhat faster, expression `(i + 3) >> 2`, which uses bit-shifting to accomplish the division by 4.)
+(The calculation `div(i + 3, 4)` or `(i + 3) ÷ 4` occurs in some important loops in the code where it is evaluated as the
+equivalent, but somewhat faster, expression `(i + 3) >> 2` that performs the integer division by 4 via shifting the number
+two bits to the right.)
 
 The virtual number of rows, `m`, can be given as a second argument in the call to `BEDFile`.
 If omitted, `m` is determined as the number of lines in the `.fam` file. 
