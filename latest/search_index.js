@@ -61,7 +61,7 @@ var documenterSearchIndex = {"docs": [
     "page": "BEDFiles.jl",
     "title": "BEDFiles.bedvals",
     "category": "constant",
-    "text": "BEDvals\n\nVector{Union{UInt8,Missings.Missing}} of the possible values in a BEDFile\n\n\n\n\n\n"
+    "text": "BEDvals\n\nVector{Union{UInt8,Missing}} of the possible values in a BEDFile\n\n\n\n\n\n"
 },
 
 {
