@@ -165,7 +165,17 @@ function Base.copyto!(v::AbstractVector{T}, f::BEDFile, j) where T <: AbstractFl
         v[i] = iszero(fij) ? zero(T) : isone(fij) ? T(NaN) : fij - 1
     end    
     v
-end    
+end
+
+function Base.copyto!(
+    v::AbstractMatrix{T}, 
+    f::BEDFile, 
+    colinds::AbstractVector{<:Integer}) where T <: AbstractFloat
+    for j in colinds
+        Base.copyto!(view(v, :, j), f, j)
+    end
+    v
+end
 
 """
     outer!(sy::Symmetric, f::BEDFile, colinds)
