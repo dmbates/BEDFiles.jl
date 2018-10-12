@@ -66,6 +66,11 @@ end
     (f.data[ip3 >> 2, j] >> ((ip3 & 0x03) << 1)) & 0x03
 end
 
+function Base.setindex!(f::BEDFile, x::UInt8, i::Int)  # Linear indexing
+    d, r = divrem(i - 1, f.m)
+    Base.setindex!(f, x, r + 1, d + 1)
+end
+
 @inline function Base.setindex!(f::BEDFile, x::UInt8, i::Integer, j::Integer)
     @boundscheck checkbounds(f, i, j)
     ip3 = i + 3
