@@ -10,8 +10,8 @@ struct BEDFile <: AbstractMatrix{UInt8}
     rowcounts::Matrix{Int}
     m::Int
 end
-function BEDFile(bednm::AbstractString, m::Integer)
-    data = open(bednm, "r") do io
+function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
+    data = open(bednm, args...; kwargs...) do io
         read(io, UInt16) == 0x1b6c || throw(ArgumentError("wrong magic number in file $bednm"))
         read(io, UInt8) == 0x01 || throw(ArgumentError(".bed file, $bednm, is not in correct orientation"))
         Mmap.mmap(io)
@@ -21,7 +21,7 @@ function BEDFile(bednm::AbstractString, m::Integer)
     iszero(r) || throw(ArgumentError("filesize of $bednm is not a multiple of $drows"))
     BEDFile(reshape(data, (drows, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
 end
-BEDFile(nm::AbstractString) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")))
+BEDFile(nm::AbstractString, args...; kwargs...) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")), args...; kwargs...)
 
 StatsBase.counts(f::BEDFile; dims=:) = _counts(f, dims)
 
@@ -64,6 +64,15 @@ end
     @boundscheck checkbounds(f, i, j)
     ip3 = i + 3
     (f.data[ip3 >> 2, j] >> ((ip3 & 0x03) << 1)) & 0x03
+end
+
+@inline function Base.setindex!(f::BEDFile, x::UInt8, i::Integer, j::Integer)
+    @boundscheck checkbounds(f, i, j)
+    ip3 = i + 3
+    shft = (ip3 & 0x03) << 1
+    mask = ~(0x03 << shft)
+    f.data[ip3 >> 2, j] = (f.data[ip3 >> 2, j] & mask) | (x << shft)
+    x
 end
 
 Base.eltype(f::BEDFile) = UInt8
