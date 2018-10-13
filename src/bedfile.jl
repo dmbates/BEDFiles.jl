@@ -276,7 +276,7 @@ end
 function Base.convert(t::Type{Matrix{T}}, f::BEDFile, colinds::AbstractVector{<:Integer}; kwargs...) where T <: AbstractFloat
     Base.copyto!(Matrix{T}(undef, f.m, length(colinds)), f, colinds; kwargs...)
 end
-Base.convert(t::Type{Matrix{T}}, f::BEDFile) where T <: AbstractFloat = Base.convert(t, f, 1:size(f, 2))
+Base.convert(t::Type{Matrix{T}}, f::BEDFile; kwargs...) where T <: AbstractFloat = Base.convert(t, f, 1:size(f, 2); kwargs...)
 
 """
 outer!(sy::Symmetric, f::BEDFile, colinds)
