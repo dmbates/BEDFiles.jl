@@ -1,5 +1,5 @@
 """
-    BEDFile
+BEDFile
 
 Raw .bed file as a shared, memory-mapped Matrix{UInt8}.  The number of rows, `m`
 is stored separately because it is not uniquely determined by the size of the `data` field.
@@ -22,6 +22,21 @@ function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
     BEDFile(reshape(data, (drows, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
 end
 BEDFile(nm::AbstractString, args...; kwargs...) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")), args...; kwargs...)
+
+function BEDFile(::UndefInitializer, m::Integer, n::Integer)
+    drows = (m + 3) >> 2    # the number of rows in the Matrix{UInt8}
+    BEDFile(Matrix{UInt8}(undef, (drows, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
+end
+
+function BEDFile(file::AbstractString, m::Integer, n::Integer)
+    drows = (m + 3) >> 2
+    io = open(file, "w+")
+    write(io, 0x1b6c)
+    write(io, 0x01)
+    write(io, fill(0x00, (drows, n)))
+    close(io)
+    BEDFile(file, m, "r+")
+end
 
 StatsBase.counts(f::BEDFile; dims=:) = _counts(f, dims)
 
@@ -115,7 +130,7 @@ end
 Base.size(f::BEDFile) = f.m, size(f.data, 2)
 
 Base.size(f::BEDFile, k::Integer) = 
-    k == 1 ? f.m : k == 2 ? size(f.data, 2) : k > 2 ? 1 : error("Dimension out of range")
+k == 1 ? f.m : k == 2 ? size(f.data, 2) : k > 2 ? 1 : error("Dimension out of range")
 
 Statistics.var(f::BEDFile; corrected::Bool=true, mean=nothing, dims=:) = _var(f, corrected, mean, dims)
 
@@ -128,7 +143,7 @@ function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
         for j in 1:n
             mnj = means[j]
             vars[j] = (abs2(mnj)*cc[1,j] + abs2(1.0 - mnj)*cc[3,j] + abs2(2.0 - mnj)*cc[4,j]) /
-                (cc[1,j] + cc[3,j] + cc[4,j] - (corrected ? 1 : 0))
+            (cc[1,j] + cc[3,j] + cc[4,j] - (corrected ? 1 : 0))
         end
         return vars
     elseif dims == 2
@@ -137,7 +152,7 @@ function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
         for i in 1:m
             mni = means[i]
             vars[i] = (abs2(mni)*rc[1,i] + abs2(1.0 - mni)*rc[3,i] + abs2(2.0 - mni)*rc[4,i]) /
-                (rc[1,i] + rc[3,i] + rc[4,i] - (corrected ? 1 : 0))
+            (rc[1,i] + rc[3,i] + rc[4,i] - (corrected ? 1 : 0))
         end
         return vars
     end
@@ -145,8 +160,8 @@ function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
 end
 
 """    
-    outer(f::BEDFile, colinds)
-    outer(f::BEDFile)
+outer(f::BEDFile, colinds)
+outer(f::BEDFile)
 
 Return the "outer product", `f * f'` using the `Float32[0, NaN, 1, 2]` encoding of `f`    
 
@@ -159,7 +174,7 @@ function outer(f::BEDFile, colinds::AbstractVector{<:Integer})
 end    
 outer(f::BEDFile) = outer(f, 1:size(f, 2))
 
-function Base.copyto!(v::AbstractVector{T}, f::BEDFile, j) where T <: AbstractFloat
+function _copyto_additive!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T <: AbstractFloat
     for i in 1:f.m
         fij = f[i, j]
         v[i] = iszero(fij) ? zero(T) : isone(fij) ? T(NaN) : fij - 1
@@ -167,18 +182,68 @@ function Base.copyto!(v::AbstractVector{T}, f::BEDFile, j) where T <: AbstractFl
     v
 end
 
+function _copyto_dominant!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T <: AbstractFloat
+    for i in 1:f.m
+        fij = f[i, j]
+        v[i] = iszero(fij) ? zero(T) : isone(fij) ? T(NaN) : 1
+    end
+    v
+end
+
+function _copyto_recessive!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T <: AbstractFloat
+    for i in 1:f.m
+        fij = f[i, j]
+        v[i] = (iszero(fij) || fij == 2) ? zero(T) : isone(fij) ? T(NaN) : 1
+    end    
+    v
+end
+
+function Base.copyto!(
+    v::AbstractVector{T}, 
+    f::BEDFile, 
+    j; 
+    model::Symbol = :additive,
+    center::Bool = false,
+    scale::Bool = false,
+    impute::Bool = false) where T <: AbstractFloat
+    if model == :additive
+        _copyto_additive!(v, f, j)
+    elseif model == :dominant
+        _copyto_dominant!(v, f, j)
+    elseif model == :recessive
+        _copyto_recessive!(v, f, j)
+    else
+        throw(ArgumentError("model has to be :additive, :dominant, or :recessive; got $model"))
+    end
+    if center || scale || impute
+        cc = _counts(f, 1)
+        μ = model == :additive ? (cc[3, j] + 2cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) : 
+            model == :dominant ? (cc[3, j] +  cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) :
+            cc[4, j] / (cc[1, j] + cc[3, j] + cc[4, j])
+        σ = model == :additive ? sqrt(μ * (1 - μ / 2)) : sqrt(μ * (1 - μ))
+        doscale = scale && (σ > 0)
+        @inbounds for i in 1:f.m
+            impute && isnan(v[i]) && (v[i] = T(μ))
+            center && (v[i] -= μ)
+            doscale && (v[i] /= σ)
+        end
+    end
+    v
+end
+
 function Base.copyto!(
     v::AbstractMatrix{T}, 
     f::BEDFile, 
-    colinds::AbstractVector{<:Integer}) where T <: AbstractFloat
+    colinds::AbstractVector{<:Integer};
+    kwargs...) where T <: AbstractFloat
     for j in colinds
-        Base.copyto!(view(v, :, j), f, j)
+        Base.copyto!(view(v, :, j), f, j; kwargs...)
     end
     v
 end
 
 """
-    outer!(sy::Symmetric, f::BEDFile, colinds)
+outer!(sy::Symmetric, f::BEDFile, colinds)
 
 update `sy` with the sum of the outer products of the columns in `colind` from `f`    
 """
@@ -191,7 +256,7 @@ function outer!(sy::Symmetric{T}, f::BEDFile, colinds::AbstractVector{<:Integer}
 end    
 
 """
-    missingpos(f::BEDFile)
+missingpos(f::BEDFile)
 
 Return a `SparseMatrixCSC{Bool,Int32}` of the same size as `f` indicating the positions with missing data
 """
