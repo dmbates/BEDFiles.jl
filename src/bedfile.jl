@@ -203,7 +203,7 @@ end
 outer(f::BEDFile) = outer(f, 1:size(f, 2))
 
 function _copyto_additive!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T <: AbstractFloat
-    for i in 1:f.m
+    @inbounds for i in 1:f.m
         fij = f[i, j]
         v[i] = iszero(fij) ? zero(T) : isone(fij) ? T(NaN) : fij - 1
     end    
@@ -211,7 +211,7 @@ function _copyto_additive!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T
 end
 
 function _copyto_dominant!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T <: AbstractFloat
-    for i in 1:f.m
+    @inbounds for i in 1:f.m
         fij = f[i, j]
         v[i] = iszero(fij) ? zero(T) : isone(fij) ? T(NaN) : 1
     end
@@ -219,7 +219,7 @@ function _copyto_dominant!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T
 end
 
 function _copyto_recessive!(v::AbstractVector{T}, f::BEDFile, j::Integer) where T <: AbstractFloat
-    for i in 1:f.m
+    @inbounds for i in 1:f.m
         fij = f[i, j]
         v[i] = (iszero(fij) || fij == 2) ? zero(T) : isone(fij) ? T(NaN) : 1
     end    
@@ -309,4 +309,31 @@ function missingpos(f::BEDFile)
         push!(colptr, colptr[end] + length(msngpos))
     end
     SparseMatrixCSC(m, n, colptr, rowval, fill(true, length(rowval)))
+end
+
+function _missingrate!(out::AbstractVector{<:AbstractFloat}, f::BEDFile,  dims::Integer)
+    m, n = size(f)
+    if isone(dims)
+        cc = _counts(f, 1)   # need to use extractor to force evaluation if needed
+        @inbounds for j in 1:n
+            out[j] = cc[2, j] / m
+        end
+    elseif dims == 2
+        rc = _counts(f, 2)
+        @inbounds for i in 1:m
+            out[i] = rc[2, i] / n
+        end
+    else
+        throw(ArgumentError("_missingrate(out, f::BEDFile, dims=k) only defined for k = 1 or 2"))
+    end
+    out
+end
+function missingrate(f::BEDFile,  dims::Integer)
+    if isone(dims)
+        return _missingrate!(Vector{Float64}(undef, size(f, 2)), f, 1)
+    elseif dims == 2 
+        return _missingrate!(Vector{Float64}(undef, f.m), f, 2)
+    else
+        throw(ArgumentError("missingrate(f::BEDFile, dims=k) only defined for k = 1 or 2"))
+    end
 end
