@@ -28,6 +28,15 @@ function BEDFile(::UndefInitializer, m::Integer, n::Integer)
     BEDFile(Matrix{UInt8}(undef, (drows, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
 end
 
+function BEDFile(file::AbstractString, f::BEDFile)
+    io = open(file, "w+")
+    write(io, 0x1b6c)
+    write(io, 0x01)
+    write(io, f.data)
+    close(io)
+    BEDFile(file, f.m, "r+")
+end
+
 function BEDFile(file::AbstractString, m::Integer, n::Integer)
     drows = (m + 3) >> 2
     io = open(file, "w+")
@@ -158,6 +167,25 @@ function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
     end
     throw(ArgumentError("var(f::BEDFile, dims=k) only defined for k = 1 or 2"))
 end
+
+function maf!(out::AbstractVector{T}, f::BEDFile) where T <: AbstractFloat
+    cc = _counts(f, 1)
+    @inbounds for j in 1:size(f, 2)
+        out[j] = (cc[3, j] + 2cc[4, j]) / 2(cc[1, j] + cc[3, j] + cc[4, j])
+        (out[j] > 0.5) && (out[j] = 1 - out[j])
+    end
+    out
+end
+maf(f::BEDFile) = maf!(Vector{Float64}(undef, size(f, 2)), f)
+
+function minorallele!(out::AbstractVector{Bool}, f::BEDFile)
+    cc = _counts(f, 1)
+    @inbounds for j in 1:size(f, 2)
+        out[j] = cc[1, j] > cc[4, j]
+    end
+    out
+end
+minorallele(f::BEDFile) = minorallele!(Vector{Bool}(undef, size(f, 2)), f)
 
 """    
 outer(f::BEDFile, colinds)
