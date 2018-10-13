@@ -264,11 +264,19 @@ function Base.copyto!(
     f::BEDFile, 
     colinds::AbstractVector{<:Integer};
     kwargs...) where T <: AbstractFloat
-    for j in colinds
-        Base.copyto!(view(v, :, j), f, j; kwargs...)
+    for (vj, j) in enumerate(colinds)
+        Base.copyto!(view(v, :, vj), f, j; kwargs...)
     end
     v
 end
+
+function Base.convert(t::Type{Vector{T}}, f::BEDFile, j::Integer; kwargs...) where T <: AbstractFloat
+    Base.copyto!(Vector{T}(undef, f.m), f, j; kwargs...)
+end
+function Base.convert(t::Type{Matrix{T}}, f::BEDFile, colinds::AbstractVector{<:Integer}; kwargs...) where T <: AbstractFloat
+    Base.copyto!(Matrix{T}(undef, f.m, length(colinds)), f, colinds; kwargs...)
+end
+Base.convert(t::Type{Matrix{T}}, f::BEDFile) where T <: AbstractFloat = Base.convert(t, f, 1:size(f, 2))
 
 """
 outer!(sy::Symmetric, f::BEDFile, colinds)
