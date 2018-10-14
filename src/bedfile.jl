@@ -229,11 +229,12 @@ end
 function Base.copyto!(
     v::AbstractVector{T}, 
     f::BEDFile, 
-    j; 
+    j::Integer; 
     model::Symbol = :additive,
     center::Bool = false,
     scale::Bool = false,
-    impute::Bool = false) where T <: AbstractFloat
+    impute::Bool = false
+    ) where T <: AbstractFloat
     if model == :additive
         _copyto_additive!(v, f, j)
     elseif model == :dominant
@@ -246,8 +247,8 @@ function Base.copyto!(
     if center || scale || impute
         cc = _counts(f, 1)
         μ = model == :additive ? (cc[3, j] + 2cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) : 
-            model == :dominant ? (cc[3, j] +  cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) :
-            cc[4, j] / (cc[1, j] + cc[3, j] + cc[4, j])
+        model == :dominant ? (cc[3, j] +  cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) :
+        cc[4, j] / (cc[1, j] + cc[3, j] + cc[4, j])
         σ = model == :additive ? sqrt(μ * (1 - μ / 2)) : sqrt(μ * (1 - μ))
         doscale = scale && (σ > 0)
         @inbounds for i in 1:f.m
@@ -337,3 +338,53 @@ function missingrate(f::BEDFile,  dims::Integer)
         throw(ArgumentError("missingrate(f::BEDFile, dims=k) only defined for k = 1 or 2"))
     end
 end
+
+
+"""
+grm(A; method=:GRM, maf_threshold=0.01)
+
+Compute empirical kinship matrix from a BEDFile. Missing genotypes are imputed
+on the fly according to minor allele frequencies.
+
+# Input  
+- `f`: a BEDFile
+
+# Optional Arguments
+- `method`: `:GRM` (default), `:MoM`, or ``
+- `maf_threshold`: SNPs with MAF `<maf_threshold` are excluded, default 0.01
+"""
+function grm(
+    f::BEDFile;
+    method::Symbol = :GRM,
+    maf_threshold::Real = 0.01,
+    mask::Union{Nothing, AbstractVector{<:Integer}} = nothing,
+    t::Type{T} = Float64
+    ) where T <: AbstractFloat
+    mf = maf(f)
+    colinds = something(mask, findall(mf .≥ maf_threshold))
+    n = length(colinds)
+    G = Mmap.mmap(Matrix{t}, f.m, n)
+    if method == :GRM
+        Base.copyto!(G, f, colinds, model=:additive, impute=true, center=true, scale=true)
+        Φ = G * transpose(G)
+        Φ ./= 2n
+    elseif method == :MoM
+        Base.copyto!(G, f, colinds, model=:additive, impute=true)
+        G .-= 1
+        Φ = G * transpose(G)
+        Φ ./= 2
+        c = mapreduce(x -> abs2(x) + abs2(1 - x), +, mf)
+        shft, scal = n / 2 - c, 1 / (n - c)
+        @inbounds @simd for i in eachindex(Φ)
+            Φ[i] = (Φ[i] + shft) * scal
+        end
+    elseif method == :Robust
+        Base.copyto!(G, f, colinds, model=:additive, center=true, impute=true)
+        scal = mapreduce(x -> 4x * (1 - x), +, mf)
+        Φ = G * transpose(G)
+        Φ ./= scal
+    else
+        throw(ArgumentError("method should be :GRM, :MoM, or :Robust; got $method"))
+    end
+    Φ
+end # function grm
