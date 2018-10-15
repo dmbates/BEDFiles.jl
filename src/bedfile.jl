@@ -1,5 +1,5 @@
 """
-BEDFile
+    BEDFile
 
 Raw .bed file as a shared, memory-mapped Matrix{UInt8}.  The number of rows, `m`
 is stored separately because it is not uniquely determined by the size of the `data` field.
@@ -188,8 +188,8 @@ end
 minorallele(f::BEDFile) = minorallele!(Vector{Bool}(undef, size(f, 2)), f)
 
 """    
-outer(f::BEDFile, colinds)
-outer(f::BEDFile)
+    outer(f::BEDFile, colinds)
+    outer(f::BEDFile)
 
 Return the "outer product", `f * f'` using the `Float32[0, NaN, 1, 2]` encoding of `f`    
 
@@ -281,7 +281,7 @@ end
 Base.convert(t::Type{Matrix{T}}, f::BEDFile; kwargs...) where T <: AbstractFloat = Base.convert(t, f, 1:size(f, 2); kwargs...)
 
 """
-outer!(sy::Symmetric, f::BEDFile, colinds)
+    outer!(sy::Symmetric, f::BEDFile, colinds)
 
 update `sy` with the sum of the outer products of the columns in `colind` from `f`    
 """
@@ -291,10 +291,10 @@ function outer!(sy::Symmetric{T}, f::BEDFile, colinds::AbstractVector{<:Integer}
         LinearAlgebra.BLAS.syr!(sy.uplo, one(T), copyto!(tempv, f, j), sy.data)
     end    
     sy
-end    
+end
 
 """
-missingpos(f::BEDFile)
+    missingpos(f::BEDFile)
 
 Return a `SparseMatrixCSC{Bool,Int32}` of the same size as `f` indicating the positions with missing data
 """
@@ -342,7 +342,7 @@ end
 
 
 """
-grm(A; method=:GRM, maf_threshold=0.01)
+    grm(A; method=:GRM, maf_threshold=0.01)
 
 Compute empirical kinship matrix from a BEDFile. Missing genotypes are imputed
 on the fly according to minor allele frequencies.
