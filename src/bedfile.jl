@@ -24,26 +24,24 @@ end
 BEDFile(nm::AbstractString, args...; kwargs...) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")), args...; kwargs...)
 
 function BEDFile(::UndefInitializer, m::Integer, n::Integer)
-    drows = (m + 3) >> 2    # the number of rows in the Matrix{UInt8}
-    BEDFile(Matrix{UInt8}(undef, (drows, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
+    BEDFile(Matrix{UInt8}(undef, ((m + 3) >> 2, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
 end
 
 function BEDFile(file::AbstractString, f::BEDFile)
-    io = open(file, "w+")
-    write(io, 0x1b6c)
-    write(io, 0x01)
-    write(io, f.data)
-    close(io)
+    open(file, "w+") do io
+        write(io, 0x1b6c)
+        write(io, 0x01)
+        write(io, f.data)
+    end
     BEDFile(file, f.m, "r+")
 end
 
 function BEDFile(file::AbstractString, m::Integer, n::Integer)
-    drows = (m + 3) >> 2
-    io = open(file, "w+")
-    write(io, 0x1b6c)
-    write(io, 0x01)
-    write(io, fill(0x00, (drows, n)))
-    close(io)
+    open(file, "w+") do io
+        write(io, 0x1b6c)
+        write(io, 0x01)
+        write(io, fill(0x00, ((m + 3) >> 2, n)))
+    end
     BEDFile(file, m, "r+")
 end
 
@@ -247,8 +245,8 @@ function Base.copyto!(
     if center || scale || impute
         cc = _counts(f, 1)
         μ = model == :additive ? (cc[3, j] + 2cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) : 
-        model == :dominant ? (cc[3, j] +  cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) :
-        cc[4, j] / (cc[1, j] + cc[3, j] + cc[4, j])
+            model == :dominant ? (cc[3, j] +  cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j]) :
+            cc[4, j] / (cc[1, j] + cc[3, j] + cc[4, j])
         σ = model == :additive ? sqrt(μ * (1 - μ / 2)) : sqrt(μ * (1 - μ))
         doscale = scale && (σ > 0)
         @inbounds for i in 1:f.m
@@ -272,11 +270,31 @@ function Base.copyto!(
     v
 end
 
+function Base.copyto!(
+    v::AbstractMatrix{T}, 
+    f::BEDFile, 
+    colmask::AbstractVector{Bool};
+    kwargs...
+    ) where T <: AbstractFloat
+    length(colmask) == size(f, 2) || throw(ArgumentError("`length(colmask)` does not match `size(f, 2)`"))
+    vj = 1
+    for j in 1:length(colmask)
+        if colmask[j] 
+            Base.copyto!(view(v, :, vj), f, j; kwargs...)
+            vj += 1
+        end
+    end
+    v
+end
+
 function Base.convert(t::Type{Vector{T}}, f::BEDFile, j::Integer; kwargs...) where T <: AbstractFloat
     Base.copyto!(Vector{T}(undef, f.m), f, j; kwargs...)
 end
 function Base.convert(t::Type{Matrix{T}}, f::BEDFile, colinds::AbstractVector{<:Integer}; kwargs...) where T <: AbstractFloat
     Base.copyto!(Matrix{T}(undef, f.m, length(colinds)), f, colinds; kwargs...)
+end
+function Base.convert(t::Type{Matrix{T}}, f::BEDFile, colmask::AbstractVector{Bool}; kwargs...) where T <: AbstractFloat
+    Base.copyto!(Matrix{T}(undef, f.m, count(colmask)), f, colmask; kwargs...)
 end
 Base.convert(t::Type{Matrix{T}}, f::BEDFile; kwargs...) where T <: AbstractFloat = Base.convert(t, f, 1:size(f, 2); kwargs...)
 
@@ -345,25 +363,27 @@ end
     grm(A; method=:GRM, maf_threshold=0.01)
 
 Compute empirical kinship matrix from a BEDFile. Missing genotypes are imputed
-on the fly according to minor allele frequencies.
+on the fly by mean.
 
 # Input  
 - `f`: a BEDFile
 
 # Optional Arguments
-- `method`: `:GRM` (default), `:MoM`, or ``
-- `maf_threshold`: SNPs with MAF `<maf_threshold` are excluded, default 0.01
+- `method`: `:GRM` (default), `:MoM`, or `Robust`
+- `maf_threshold`: columns with MAF `<maf_threshold` are excluded; default 0.01
+- `cinds`: indices or mask of columns to be used for calculating GRM
+- `t`: Float type for calculating GRM
 """
 function grm(
     f::BEDFile;
     method::Symbol = :GRM,
     maf_threshold::Real = 0.01,
-    mask::Union{Nothing, AbstractVector{<:Integer}} = nothing,
+    cinds::Union{Nothing, AbstractVector{<:Integer}} = nothing,
     t::Type{T} = Float64
     ) where T <: AbstractFloat
     mf = maf(f)
-    colinds = something(mask, findall(mf .≥ maf_threshold))
-    n = length(colinds)
+    colinds = something(cinds, mf .≥ maf_threshold)
+    n = eltype(colinds) == Bool ? count(colinds) : length(colinds)
     G = Mmap.mmap(Matrix{t}, f.m, n)
     if method == :GRM
         Base.copyto!(G, f, colinds, model=:additive, impute=true, center=true, scale=true)
@@ -373,15 +393,14 @@ function grm(
         Base.copyto!(G, f, colinds, model=:additive, impute=true)
         G .-= 1
         Φ = G * transpose(G)
-        Φ ./= 2
-        c = mapreduce(x -> abs2(x) + abs2(1 - x), +, mf)
+        c = sum(x -> abs2(x) + abs2(1 - x), mf)
         shft, scal = n / 2 - c, 1 / (n - c)
         @inbounds @simd for i in eachindex(Φ)
-            Φ[i] = (Φ[i] + shft) * scal
+            Φ[i] = (Φ[i] / 2 + shft) * scal
         end
     elseif method == :Robust
         Base.copyto!(G, f, colinds, model=:additive, center=true, impute=true)
-        scal = mapreduce(x -> 4x * (1 - x), +, mf)
+        scal = sum(x -> 4x * (1 - x), mf)
         Φ = G * transpose(G)
         Φ ./= scal
     else
@@ -402,8 +421,8 @@ Filter a BEDFile by genotyping success rate.
 - `maxiters`: maximum number of filtering iterations.
 
 # Output
-- `rmask`: Bool vector indicating remaining rows.
-- `cmask`: Bool vector indicating remaining cols.
+- `rmask`: BitVector indicating remaining rows.
+- `cmask`: BitVector indicating remaining cols.
 """
 function filter(
     f::BEDFile, 
@@ -420,15 +439,15 @@ function filter(
         @inbounds for j in 1:n
             cmask[j] || continue
             for i in 1:m
-                rmask[i] || (f[i, j] == 0x01) && (rc[i] += 1; cc[j] += 1)
+                rmask[i] && f[i, j] == 0x01 && (rc[i] += 1; cc[j] += 1)
             end
         end
         rows, cols = count(rmask), count(cmask)
         @inbounds for j in 1:n
-            cmask[j] = cmask[j] && (cc[j] < (1 - min_success_rate_per_col) * rows)
+            cmask[j] = cmask[j] && cc[j] < cmiss * rows
         end
         @inbounds for i in 1:m
-            rmask[i] = rmask[i] && (rc[i] < (1 - min_success_rate_per_row) * cols)
+            rmask[i] = rmask[i] && rc[i] < rmiss * cols
         end
         count(cmask) == cols && count(rmask) == rows && break
         iter == maxiters && (@warn "success rate not satisfied; consider increase maxiters")
@@ -475,25 +494,25 @@ function filter(
     m, n = count(rmask), count(cmask)
     bfsrc = BEDFile(src * ".bed")
     # write filtered bed file
-    io = open(des * ".bed", "w+")
-    write(io, 0x1b6c)
-    write(io, 0x01)
-    write(io, fill(0x00, ((m + 3) >> 2, n)))
-    close(io)
+    open(des * ".bed", "w+") do io
+        write(io, 0x1b6c)
+        write(io, 0x01)
+        write(io, Matrix{UInt8}(undef, (m + 3) >> 2, n))
+    end
     bfdes = BEDFile(des * ".bed", m, "r+")
     bfdes .= @view bfsrc[rmask, cmask]
     # write filtered fam file
-    out = open(des * ".fam", "w")
-    for (i, line) in enumerate(eachline(src * ".fam"))
-        rmask[i] && println(out, line)
+    open(des * ".fam", "w") do io
+        for (i, line) in enumerate(eachline(src * ".fam"))
+            rmask[i] && println(io, line)
+        end
     end
-    close(out)
     # write filtered bim file
-    out = open(des * ".bim", "w")
-    for (j, line) in enumerate(eachline(src * ".bim"))
-        cmask[j] && println(out, line)
+    open(des * ".bim", "w") do io
+        for (j, line) in enumerate(eachline(src * ".bim"))
+            cmask[j] && println(io, line)
+        end
     end
-    close(out)
     # output BEDFile
     bfdes
 end
