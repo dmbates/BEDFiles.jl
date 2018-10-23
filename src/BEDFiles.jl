@@ -2,10 +2,10 @@ __precompile__()
 
 module BEDFiles
     using LinearAlgebra, Missings, Mmap, OffsetArrays, SparseArrays, Statistics, StatsBase
-    import Base: IndexStyle, convert, copyto!, eltype, getindex, length, size
+    import Base: IndexStyle, convert, copyto!, eltype, getindex, setindex!, length, size
     import Statistics: mean, std, var
     import StatsBase: counts
-    export BEDFile, bedvals, counts, mean, missingpos, std, var
+    export BEDFile, bedvals, counts, grm, maf, minorallele, mean, missingpos, missingrate, std, var
     
     include("bedfile.jl")
 
