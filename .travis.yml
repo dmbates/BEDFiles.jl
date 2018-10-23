@@ -14,7 +14,7 @@ git:
   depth: 99999999
 
 after_script:  # TODO: change to after_success once https://github.com/JuliaLang/julia/issues/28306 is fixed
-  # push coverage results to Codecov
+  # push coverage results to Codecov and Coveralls
   - julia -e 'using Pkg, BEDFiles; cd(joinpath(dirname(pathof(BEDFiles)), "..")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder()); Coveralls.submit(process_folder())'
   # Update the documentation
   - julia -e 'using Pkg; Pkg.add("Documenter")'
