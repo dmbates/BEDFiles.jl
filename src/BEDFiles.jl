@@ -1,7 +1,7 @@
 __precompile__()
 
 module BEDFiles
-    using LinearAlgebra, Missings, Mmap, OffsetArrays, SparseArrays, Statistics, StatsBase
+    using LinearAlgebra, Mmap, OffsetArrays, SparseArrays, Statistics, StatsBase
     import Base: IndexStyle, convert, copyto!, eltype, getindex, length, size
     import Statistics: mean, std, var
     import StatsBase: counts
@@ -12,7 +12,7 @@ module BEDFiles
 """
     BEDvals
 
-`Vector{Union{UInt8,Missings.Missing}}` of the possible values in a BEDFile
+`Vector{Union{UInt8,Missing}}` of the possible values in a BEDFile
 """
     const bedvals = OffsetArray{Union{Int8,Missing}}(undef, 0:3)
     bedvals[0] = 0
