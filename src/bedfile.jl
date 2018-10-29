@@ -169,11 +169,19 @@ end
 function maf!(out::AbstractVector{T}, f::BEDFile) where T <: AbstractFloat
     cc = _counts(f, 1)
     @inbounds for j in 1:size(f, 2)
-        out[j] = (cc[3, j] + 2cc[4, j]) / 2(cc[1, j] + cc[3, j] + cc[4, j])
-        (out[j] > 0.5) && (out[j] = 1 - out[j])
+        freq = convert(T, (cc[3, j] + 2cc[4, j])) / 2(cc[1, j] + cc[3, j] + cc[4, j])
+        out[j] = freq ≤ 0.5 ? freq : 1 - freq
     end
     out
 end
+
+"""
+    maf(f::BEDFile)
+
+Return a vector of minor allele frequencies for the columns of `f`.
+
+By definition the minor allele frequency is between 0 and 0.5
+"""
 maf(f::BEDFile) = maf!(Vector{Float64}(undef, size(f, 2)), f)
 
 function minorallele!(out::AbstractVector{Bool}, f::BEDFile)
@@ -183,6 +191,12 @@ function minorallele!(out::AbstractVector{Bool}, f::BEDFile)
     end
     out
 end
+
+"""
+    minorallele(f::BEDFile)
+
+Return a `Vector{Bool}` indicating if the minor allele in each column is A2
+"""
 minorallele(f::BEDFile) = minorallele!(Vector{Bool}(undef, size(f, 2)), f)
 
 """    
