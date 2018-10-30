@@ -1,7 +1,7 @@
 __precompile__()
 
 module BEDFiles
-    using LinearAlgebra, Mmap, OffsetArrays, SparseArrays, Statistics, StatsBase
+    using LinearAlgebra, Mmap, OffsetArrays, SparseArrays, StaticArrays, Statistics, StatsBase
     import Base: IndexStyle, convert, copyto!, eltype, getindex, setindex!, length, size
     import Statistics: mean, std, var
     import StatsBase: counts

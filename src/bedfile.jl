@@ -1,12 +1,21 @@
 """
     BEDFile
 
-Raw .bed file as a shared, memory-mapped Matrix{UInt8}.  The number of rows, `m`
-is stored separately because it is not uniquely determined by the size of the `data` field.
+Raw .bed file as a shared, memory-mapped Matrix{UInt8}.
+- `data`: The compressed data matrix in which up to 4 SNP calls are stored in each `UInt8` element
+- `columncounts`: a `4` by `n` `Int` matrix of column counts for each of the 4 possible calls
+-
+- `rowcounts`: a `4` by `m` array of row counts for each of the 4 possible calls
+- `m`: the number of rows in the virtual array.
+
+`m` is stored separately because it is not uniquely determined from the size of `data`.  If `data`
+has `k` rows then `m` could be `4k - 3` or `4k - 2` or `4k - 1` or `4k` because the number of bytes
+in a column of `data` is `k = (m + 3) ÷ 4`
 """
 struct BEDFile <: AbstractMatrix{UInt8}
     data::Matrix{UInt8}
     columncounts::Matrix{Int}
+    staticcounts::Base.ReinterpretArray{SArray{Tuple{4},Int,1,4},1,Int,Array{Int,1}}
     rowcounts::Matrix{Int}
     m::Int
 end
@@ -19,7 +28,9 @@ function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
     drows = (m + 3) >> 2   # the number of rows in the Matrix{UInt8}
     n, r = divrem(length(data), drows)
     iszero(r) || throw(ArgumentError("filesize of $bednm is not a multiple of $drows"))
-    BEDFile(reshape(data, (drows, n)), zeros(Int, (4, n)), zeros(Int, (4, m)), m)
+    ccounts = zeros(Int, (4, n))
+    BEDFile(reshape(data, (drows, n)), ccounts, reinterpret(SVector{4, Int}, vec(ccounts)),
+        zeros(Int, (4, m)), m)
 end
 BEDFile(nm::AbstractString, args...; kwargs...) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")), args...; kwargs...)
 
@@ -108,15 +119,13 @@ Base.length(f::BEDFile) = f.m * size(f.data, 2)
 
 Statistics.mean(f::BEDFile; dims=:) = _mean(f, dims)
 
+meanfromcounts(v::SVector{4,Int}) = (v[3] + 2v[4]) / (v[1] + v[3] + v[4])
+
 function _mean(f::BEDFile,  dims::Integer)
     m, n = size(f)
     if isone(dims)
-        cc = _counts(f, 1)   # need to use extractor to force evaluation if needed
-        means = Matrix{Float64}(undef, (1, n))
-        @inbounds for j in 1:n
-            means[j] = (cc[3, j] + 2*cc[4, j]) / (cc[1, j] + cc[3, j] + cc[4, j])
-        end
-        return means
+        cc = _counts(f, 1)   # use the extractor to ensure f.columncounts has been evaluated
+        return meanfromcounts.(f.staticcounts)
     elseif dims == 2
         rc = _counts(f, 2)
         means = Matrix{Float64}(undef, (m, 1))
@@ -137,7 +146,7 @@ end
 Base.size(f::BEDFile) = f.m, size(f.data, 2)
 
 Base.size(f::BEDFile, k::Integer) = 
-k == 1 ? f.m : k == 2 ? size(f.data, 2) : k > 2 ? 1 : error("Dimension out of range")
+    k == 1 ? f.m : k == 2 ? size(f.data, 2) : k > 2 ? 1 : error("Dimension out of range")
 
 Statistics.var(f::BEDFile; corrected::Bool=true, mean=nothing, dims=:) = _var(f, corrected, mean, dims)
 
@@ -166,13 +175,14 @@ function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
     throw(ArgumentError("var(f::BEDFile, dims=k) only defined for k = 1 or 2"))
 end
 
+function maffromcounts(v::SVector{4, Int})
+    freq = (v[3] + 2v[4]) / 2(v[1] + v[3] + v[4])
+    freq ≤ 0.5 ? freq : 1 - freq
+end
+
 function maf!(out::AbstractVector{T}, f::BEDFile) where T <: AbstractFloat
     cc = _counts(f, 1)
-    @inbounds for j in 1:size(f, 2)
-        freq = convert(T, (cc[3, j] + 2cc[4, j])) / 2(cc[1, j] + cc[3, j] + cc[4, j])
-        out[j] = freq ≤ 0.5 ? freq : 1 - freq
-    end
-    out
+    map!(maffromcounts, out, f.staticcounts)
 end
 
 """
@@ -184,12 +194,11 @@ By definition the minor allele frequency is between 0 and 0.5
 """
 maf(f::BEDFile) = maf!(Vector{Float64}(undef, size(f, 2)), f)
 
+minorallelefromcounts(v::SVector{4, Int}) = v[1] > v[4]
+
 function minorallele!(out::AbstractVector{Bool}, f::BEDFile)
     cc = _counts(f, 1)
-    @inbounds for j in 1:size(f, 2)
-        out[j] = cc[1, j] > cc[4, j]
-    end
-    out
+    map!(minorallelefromcounts, out, f.staticcounts)
 end
 
 """
@@ -199,7 +208,7 @@ Return a `Vector{Bool}` indicating if the minor allele in each column is A2
 """
 minorallele(f::BEDFile) = minorallele!(Vector{Bool}(undef, size(f, 2)), f)
 
-"""    
+"""
     outer(f::BEDFile, colinds)
     outer(f::BEDFile)
 
