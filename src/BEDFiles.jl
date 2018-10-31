@@ -8,6 +8,7 @@ module BEDFiles
     export BEDFile, bedvals, counts, grm, maf, minorallele, mean, missingpos, missingrate, std, var
     
     include("bedfile.jl")
+    include("summarystats.jl")
 
 """
     BEDvals

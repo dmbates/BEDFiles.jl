@@ -28,7 +28,23 @@ function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
     drows = (m + 3) >> 2   # the number of rows in the Matrix{UInt8}
     n, r = divrem(length(data), drows)
     iszero(r) || throw(ArgumentError("filesize of $bednm is not a multiple of $drows"))
+    d, r = divrem(m, 4)
     ccounts = zeros(Int, (4, n))
+    for j in 1:n
+        offset = drows * (j - 1)
+        for i in 1:d
+            bb = data[offset + i]
+            for s in 0:2:6
+                ccounts[((bb >> s) & 0x03) + 1, j] += 1
+            end
+            if !iszero(r)
+                bb = data[offset + d + 1]
+                for s in 0:2:(2*(r-1))
+                    ccounts[((bb >> s) & 0x03) + 1, j] += 1
+                end
+            end
+        end
+    end
     BEDFile(reshape(data, (drows, n)), ccounts, reinterpret(SVector{4, Int}, vec(ccounts)),
         zeros(Int, (4, m)), m)
 end
@@ -55,38 +71,6 @@ function BEDFile(file::AbstractString, m::Integer, n::Integer)
     end
     BEDFile(file, m, "r+")
 end
-
-StatsBase.counts(f::BEDFile; dims=:) = _counts(f, dims)
-
-function _counts(f::BEDFile, dims::Integer)
-    if isone(dims)
-        cc = f.columncounts
-        if all(iszero, cc)
-            m, n = size(f)
-            @inbounds for j in 1:n
-                for i in 1:m
-                    cc[f[i, j] + 1, j] += 1            
-                end
-            end
-        end
-        return cc
-    elseif dims == 2
-        rc = f.rowcounts
-        if all(iszero, rc)
-            m, n = size(f)
-            @inbounds for j in 1:n
-                for i in 1:m
-                    rc[f[i, j] + 1, i] += 1            
-                end
-            end
-        end
-        return rc
-    else
-        throw(ArgumentError("counts(f::BEDFile, dims=k) only defined for k = 1 or 2"))
-    end
-end
-
-_counts(f::BEDFile, ::Colon) = sum(_counts(f, 1), dims=2)
 
 function Base.getindex(f::BEDFile, i::Int)  # Linear indexing
     d, r = divrem(i - 1, f.m)
@@ -117,96 +101,10 @@ Base.eltype(f::BEDFile) = UInt8
 
 Base.length(f::BEDFile) = f.m * size(f.data, 2)
 
-Statistics.mean(f::BEDFile; dims=:) = _mean(f, dims)
-
-meanfromcounts(v::SVector{4,Int}) = (v[3] + 2v[4]) / (v[1] + v[3] + v[4])
-
-function _mean(f::BEDFile,  dims::Integer)
-    m, n = size(f)
-    if isone(dims)
-        cc = _counts(f, 1)   # use the extractor to ensure f.columncounts has been evaluated
-        return meanfromcounts.(f.staticcounts)
-    elseif dims == 2
-        rc = _counts(f, 2)
-        means = Matrix{Float64}(undef, (m, 1))
-        @inbounds for i in 1:m
-            means[i] = (rc[3, i] + 2*rc[4, i]) / (rc[1, i] + rc[3, i] + rc[4, i])
-        end
-        return means
-    else
-        throw(ArgumentError("mean(f::BEDFile, dims=k) only defined for k = 1 or 2"))
-    end
-end
-
-function _mean(f::BEDFile, ::Colon)
-    rc = _counts(f, 2)
-    (sum(view(rc, 3, :)) + 2*sum(view(rc, 4, :))) / sum(view(rc, [1, 3, 4], :))
-end
-
 Base.size(f::BEDFile) = f.m, size(f.data, 2)
 
 Base.size(f::BEDFile, k::Integer) = 
     k == 1 ? f.m : k == 2 ? size(f.data, 2) : k > 2 ? 1 : error("Dimension out of range")
-
-Statistics.var(f::BEDFile; corrected::Bool=true, mean=nothing, dims=:) = _var(f, corrected, mean, dims)
-
-function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
-    m, n = size(f)
-    means = something(mean, Statistics.mean(f, dims=dims))
-    if isone(dims)
-        cc = _counts(f, 1)
-        vars = Matrix{Float64}(undef, (1, n))
-        for j in 1:n
-            mnj = means[j]
-            vars[j] = (abs2(mnj)*cc[1,j] + abs2(1.0 - mnj)*cc[3,j] + abs2(2.0 - mnj)*cc[4,j]) /
-            (cc[1,j] + cc[3,j] + cc[4,j] - (corrected ? 1 : 0))
-        end
-        return vars
-    elseif dims == 2
-        rc = _counts(f, 2)
-        vars = Matrix{Float64}(undef, (m, 1))
-        for i in 1:m
-            mni = means[i]
-            vars[i] = (abs2(mni)*rc[1,i] + abs2(1.0 - mni)*rc[3,i] + abs2(2.0 - mni)*rc[4,i]) /
-            (rc[1,i] + rc[3,i] + rc[4,i] - (corrected ? 1 : 0))
-        end
-        return vars
-    end
-    throw(ArgumentError("var(f::BEDFile, dims=k) only defined for k = 1 or 2"))
-end
-
-function maffromcounts(v::SVector{4, Int})
-    freq = (v[3] + 2v[4]) / 2(v[1] + v[3] + v[4])
-    freq ≤ 0.5 ? freq : 1 - freq
-end
-
-function maf!(out::AbstractVector{T}, f::BEDFile) where T <: AbstractFloat
-    cc = _counts(f, 1)
-    map!(maffromcounts, out, f.staticcounts)
-end
-
-"""
-    maf(f::BEDFile)
-
-Return a vector of minor allele frequencies for the columns of `f`.
-
-By definition the minor allele frequency is between 0 and 0.5
-"""
-maf(f::BEDFile) = maf!(Vector{Float64}(undef, size(f, 2)), f)
-
-minorallelefromcounts(v::SVector{4, Int}) = v[1] > v[4]
-
-function minorallele!(out::AbstractVector{Bool}, f::BEDFile)
-    cc = _counts(f, 1)
-    map!(minorallelefromcounts, out, f.staticcounts)
-end
-
-"""
-    minorallele(f::BEDFile)
-
-Return a `Vector{Bool}` indicating if the minor allele in each column is A2
-"""
-minorallele(f::BEDFile) = minorallele!(Vector{Bool}(undef, size(f, 2)), f)
 
 """
     outer(f::BEDFile, colinds)
@@ -353,34 +251,6 @@ function missingpos(f::BEDFile)
     end
     SparseMatrixCSC(m, n, colptr, rowval, fill(true, length(rowval)))
 end
-
-function _missingrate!(out::AbstractVector{<:AbstractFloat}, f::BEDFile,  dims::Integer)
-    m, n = size(f)
-    if isone(dims)
-        cc = _counts(f, 1)   # need to use extractor to force evaluation if needed
-        @inbounds for j in 1:n
-            out[j] = cc[2, j] / m
-        end
-    elseif dims == 2
-        rc = _counts(f, 2)
-        @inbounds for i in 1:m
-            out[i] = rc[2, i] / n
-        end
-    else
-        throw(ArgumentError("_missingrate(out, f::BEDFile, dims=k) only defined for k = 1 or 2"))
-    end
-    out
-end
-function missingrate(f::BEDFile,  dims::Integer)
-    if isone(dims)
-        return _missingrate!(Vector{Float64}(undef, size(f, 2)), f, 1)
-    elseif dims == 2 
-        return _missingrate!(Vector{Float64}(undef, f.m), f, 2)
-    else
-        throw(ArgumentError("missingrate(f::BEDFile, dims=k) only defined for k = 1 or 2"))
-    end
-end
-
 
 """
     grm(A; method=:GRM, maf_threshold=0.01)
