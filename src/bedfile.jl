@@ -4,7 +4,7 @@
 Raw .bed file as a shared, memory-mapped Matrix{UInt8}.
 - `data`: The compressed data matrix in which up to 4 SNP calls are stored in each `UInt8` element
 - `columncounts`: a `4` by `n` `Int` matrix of column counts for each of the 4 possible calls
--
+- `staticcounts`: the contents of columncounts as an n-dimensional vector of `SVector{4, Int}`
 - `rowcounts`: a `4` by `m` array of row counts for each of the 4 possible calls
 - `m`: the number of rows in the virtual array.
 
@@ -37,11 +37,11 @@ function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
             for s in 0:2:6
                 ccounts[((bb >> s) & 0x03) + 1, j] += 1
             end
-            if !iszero(r)
-                bb = data[offset + d + 1]
-                for s in 0:2:(2*(r-1))
-                    ccounts[((bb >> s) & 0x03) + 1, j] += 1
-                end
+        end
+        if !iszero(r)
+            bb = data[offset + d + 1]
+            for s in 0:2:(2*(r-1))
+                ccounts[((bb >> s) & 0x03) + 1, j] += 1
             end
         end
     end

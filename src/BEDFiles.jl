@@ -5,7 +5,8 @@ module BEDFiles
     import Base: IndexStyle, convert, copyto!, eltype, getindex, setindex!, length, size
     import Statistics: mean, std, var
     import StatsBase: counts
-    export BEDFile, bedvals, counts, grm, maf, minorallele, mean, missingpos, missingrate, std, var
+    export BEDFile, bedvals, counts, grm, maf, maf!, minorallele, minorallele!, 
+        mean, mean!, missingpos, missingrate, missingrate!, std, var
     
     include("bedfile.jl")
     include("summarystats.jl")
