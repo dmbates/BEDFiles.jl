@@ -1,60 +1,49 @@
 StatsBase.counts(f::BEDFile; dims=:) = _counts(f, dims)
 
 function _counts(f::BEDFile, dims::Integer)
-    isone(dims) && return f.columncounts
-    if dims == 2
-        rc = f.rowcounts
-        if all(iszero, rc)
-            m, n = size(f)
-            @inbounds for j in 1:n
-                for i in 1:m
-                    rc[f[i, j] + 1, i] += 1            
-                end
-            end
-        end
-        return rc
+    if dims == 1
+        f.columncounts
+    elseif dims == 2
+        f.rowcounts
     else
         throw(ArgumentError("counts(f::BEDFile, dims=k) only defined for k = 1 or 2"))
     end
 end
 
-_counts(f::BEDFile, ::Colon) = sum(f.staticcounts)
+_counts(f::BEDFile, ::Colon) = sum(f.sccounts)
+
+@inline nnonmiss(v::SVector{4,Int}) = v[1] + v[3] + v[4]
+
+meanfromcounts(v::SVector{4,Int}) = (v[3] + 2v[4]) / nnonmiss(v)
 
 Statistics.mean(f::BEDFile; dims=:) = _mean(f, dims)
 
 function _mean(f::BEDFile,  dims::Integer)
-    if isone(dims)
-        mean!(Matrix{Float64}(undef, (1, size(f, 2))), f)
+    if dims == 1
+        reshape(meanfromcounts.(f.sccounts), (1, size(f, 2)))
     elseif dims == 2
-        mean!(Matrix{Float64}(undef, (size(f, 1), 1)), f)
+        reshape(meanfromcounts.(f.srcounts), (size(f, 1), 1))
     else
         throw(ArgumentError("mean(f::BEDFile, dims=k) only defined for k = 1 or 2"))
     end
 end
 
-nnonmiss(v::SVector{4,Int}) = v[1] + v[3] + v[4]
-
-meanfromcounts(v::SVector{4,Int}) = (v[3] + 2v[4]) / nnonmiss(v)
-
-_mean(f::BEDFile, ::Colon) = meanfromcounts(sum(f.staticcounts))
+_mean(f::BEDFile, ::Colon) = meanfromcounts(sum(f.sccounts))
 
 function Statistics.mean!(out::AbstractMatrix{<:AbstractFloat}, f::BEDFile)
     k, l = size(out)
     m, n = size(f)
-    errormsg = "size(out) = $(size(out)) should be (1,1) or (1,$n) or ($m,1)"
-    if isone(k)
-        if isone(l)
+    errormsg = "size(out) should be (1,1) or (1,size(f,2)) or (size(f,1),1)"
+    if k == 1
+        if l == 1
             out[1] = _mean(f, :)
         elseif l == n
-            map!(meanfromcounts, out, f.staticcounts)
+            map!(meanfromcounts, out, f.sccounts)
         else
             throw(ArgumentError(errormsg))
         end
-    elseif k == m && isone(l)
-        rc = _counts(f, 2)
-        @inbounds for i in 1:m
-            out[i, 1] = (rc[3, i] + 2rc[4, i]) / (rc[1, i] + rc[3, i] + rc[4, i])
-        end
+    elseif k == m && l == 1
+        map!(meanfromcounts, out, f.srcounts)
     else
         throw(ArgumentError(errmsg))
     end
@@ -73,20 +62,17 @@ If `size(out) == (1,1)` it is overwritten with the overall rate of missing value
 function missingrate!(out::AbstractMatrix{<:AbstractFloat}, f::BEDFile)
     k, l = size(out)
     m, n = size(f)
-    errormsg = "size(out) = $(size(out)) should be (1,1) or (1,$n) or ($m,1)"
-    if isone(k)
-        if isone(l)
-            out[1] = sum(v -> v[2], f.staticcounts) / length(f)
+    errormsg = "size(out) should be (1,1) or (1,size(f,2)) or (size(f,1),1)"
+    if k == 1
+        if l == 1
+            out[1] = sum(v -> v[2], f.sccounts) / length(f)
         elseif l == n
-            map!(v -> v[2] / m, out, f.staticcounts)
+            map!(v -> v[2] / m, out, f.sccounts)
         else
             throw(ArgumentError(errormsg))
         end
-    elseif k == m && isone(l)
-        rc = _counts(f, 2)
-        @inbounds for i in 1:m
-            out[i] = rc[2, i] / n
-        end
+    elseif k == m && l == 1
+        map!(v -> v[2] / n, out, f.srcounts)
     else
         throw(ArgumentError(errormsg))
     end
@@ -101,16 +87,17 @@ Return the rate of missing values in `f` by column (`dims=1`), by row (`dims=2`)
 missingrate(f::BEDFile; dims=:) = _missingrate(f, dims)
 
 function _missingrate(f::BEDFile, dims::Integer)
-    if isone(dims)
-        missingrate!(Matrix{Float64}(undef, (1, size(f, 2))), f)
-    elseif dims == 2 
-        missingrate!(Matrix{Float64}(undef, (f.m, 1)), f)
+    m, n = size(f)
+    if dims == 1
+        reshape([v[2] / m for v in f.sccounts], (1, n))
+    elseif dims == 2
+        reshape([v[2] / n for v in f.srcounts], (m, 1))
     else
         throw(ArgumentError("missingrate(f::BEDFile, dims=k) only defined for k = 1 or 2"))
     end
 end
 
-_missingrate(f::BEDFile, ::Colon) = sum(v -> v[2], f.staticcounts) / length(f)
+_missingrate(f::BEDFile, ::Colon) = sum(view(f.rowcounts, 2, :)) / length(f)
 
 Statistics.var(f::BEDFile; corrected::Bool=true, mean=nothing, dims=:) = 
     _var(f, corrected, mean, dims)
@@ -125,18 +112,10 @@ end
 
 function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
     m, n = size(f)
-    if isone(dims)
-        reshape([varfromcounts(v, corrected, mean) for v in f.staticcounts], (1, size(f,2)))
+    if dims == 1
+        reshape([varfromcounts(v, corrected, mean) for v in f.sccounts], (1, n))
     elseif dims == 2
-        means = something(mean, Statistics.mean(f, dims=2))
-        rc = _counts(f, 2)
-        vars = Matrix{Float64}(undef, (m, 1))
-        for i in 1:m
-            mni = means[i]
-            vars[i] = (abs2(mni)*rc[1,i] + abs2(1.0 - mni)*rc[3,i] + abs2(2.0 - mni)*rc[4,i]) /
-                (rc[1,i] + rc[3,i] + rc[4,i] - Int(corrected))
-        end
-        vars
+        reshape([varfromcounts(v, corrected, mean) for v in f.srcounts], (m, 1))
     else
         throw(ArgumentError("var(f::BEDFile, dims=k) only defined for k = 1 or 2"))
     end
@@ -147,7 +126,7 @@ function maffromcounts(v::SVector{4, Int})
     freq ≤ 0.5 ? freq : 1 - freq
 end
 
-maf!(out::AbstractVector{<:AbstractFloat}, f::BEDFile) = map!(maffromcounts, out, f.staticcounts)
+maf!(out::AbstractVector{<:AbstractFloat}, f::BEDFile) = map!(maffromcounts, out, f.sccounts)
 
 """
     maf(f::BEDFile)
@@ -156,16 +135,16 @@ Return a vector of minor allele frequencies for the columns of `f`.
 
 By definition the minor allele frequency is between 0 and 0.5
 """
-maf(f::BEDFile) = maf!(Vector{Float64}(undef, size(f, 2)), f)
+maf(f::BEDFile) = maffromcounts.(f.sccounts)
 
 minorallelefromcounts(v::SVector{4, Int}) = v[1] > v[4]
 
 minorallele!(out::AbstractVector{Bool}, f::BEDFile) =
-    map!(minorallelefromcounts, out, f.staticcounts)
+    map!(minorallelefromcounts, out, f.sccounts)
 
 """
     minorallele(f::BEDFile)
 
 Return a `Vector{Bool}` indicating if the minor allele in each column is A2
 """
-minorallele(f::BEDFile) = minorallele!(Vector{Bool}(undef, size(f, 2)), f)
+minorallele(f::BEDFile) = minorallelefromcounts.(f.sccounts)

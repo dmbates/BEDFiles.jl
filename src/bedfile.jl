@@ -4,8 +4,9 @@
 Raw .bed file as a shared, memory-mapped Matrix{UInt8}.
 - `data`: The compressed data matrix in which up to 4 SNP calls are stored in each `UInt8` element
 - `columncounts`: a `4` by `n` `Int` matrix of column counts for each of the 4 possible calls
-- `staticcounts`: the contents of columncounts as an n-dimensional vector of `SVector{4, Int}`
+- `sccounts`: the contents of columncounts as an n-dimensional vector of `SVector{4, Int}`
 - `rowcounts`: a `4` by `m` array of row counts for each of the 4 possible calls
+- `srcounts`: the contents of rowcounts as an n-dimensional vector of `SVector{4, Int}`
 - `m`: the number of rows in the virtual array.
 
 `m` is stored separately because it is not uniquely determined from the size of `data`.  If `data`
@@ -15,8 +16,9 @@ in a column of `data` is `k = (m + 3) ÷ 4`
 struct BEDFile <: AbstractMatrix{UInt8}
     data::Matrix{UInt8}
     columncounts::Matrix{Int}
-    staticcounts::Base.ReinterpretArray{SArray{Tuple{4},Int,1,4},1,Int,Array{Int,1}}
+    sccounts::Base.ReinterpretArray{SArray{Tuple{4},Int,1,4},1,Int,Array{Int,1}}
     rowcounts::Matrix{Int}
+    srcounts::Base.ReinterpretArray{SArray{Tuple{4},Int,1,4},1,Int,Array{Int,1}}
     m::Int
 end
 function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
@@ -29,24 +31,30 @@ function BEDFile(bednm::AbstractString, m::Integer, args...; kwargs...)
     n, r = divrem(length(data), drows)
     iszero(r) || throw(ArgumentError("filesize of $bednm is not a multiple of $drows"))
     d, r = divrem(m, 4)
+    rcounts = zeros(Int, (4, m))
     ccounts = zeros(Int, (4, n))
     for j in 1:n
         offset = drows * (j - 1)
         for i in 1:d
             bb = data[offset + i]
-            for s in 0:2:6
-                ccounts[((bb >> s) & 0x03) + 1, j] += 1
+            for s in 0:3
+                ind = ((bb >> (s << 1)) & 0x03) + 1     # f[i,j] as a 1-based index
+                ccounts[ind, j] += 1
+                rcounts[ind, ((i - 1) << 2) + s + 1] += 1
             end
         end
         if !iszero(r)
-            bb = data[offset + d + 1]
-            for s in 0:2:(2*(r-1))
-                ccounts[((bb >> s) & 0x03) + 1, j] += 1
+            i = d + 1
+            bb = data[offset + i]
+            for s in 0:(r-1)
+                ind = ((bb >> (s << 1)) & 0x03) + 1
+                ccounts[ind, j] += 1
+                rcounts[ind, ((i - 1) << 2) + s + 1] += 1
             end
         end
     end
     BEDFile(reshape(data, (drows, n)), ccounts, reinterpret(SVector{4, Int}, vec(ccounts)),
-        zeros(Int, (4, m)), m)
+        rcounts, reinterpret(SVector{4, Int}, vec(rcounts)), m)
 end
 BEDFile(nm::AbstractString, args...; kwargs...) = BEDFile(nm, countlines(string(splitext(nm)[1], ".fam")), args...; kwargs...)
 
