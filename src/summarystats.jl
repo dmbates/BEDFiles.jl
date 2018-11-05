@@ -12,9 +12,9 @@ end
 
 _counts(f::BEDFile, ::Colon) = sum(f.sccounts)
 
-@inline nnonmiss(v::SVector{4,Int}) = v[1] + v[3] + v[4]
+@inline nnonmiss(v::AbstractVector{<:Integer}) = v[1] + v[3] + v[4]
 
-meanfromcounts(v::SVector{4,Int}) = (v[3] + 2v[4]) / nnonmiss(v)
+meanfromcounts(v::AbstractVector{<:Integer}) = (v[3] + 2v[4]) / nnonmiss(v)
 
 Statistics.mean(f::BEDFile; dims=:) = _mean(f, dims)
 
@@ -102,7 +102,7 @@ _missingrate(f::BEDFile, ::Colon) = sum(view(f.rowcounts, 2, :)) / length(f)
 Statistics.var(f::BEDFile; corrected::Bool=true, mean=nothing, dims=:) = 
     _var(f, corrected, mean, dims)
 
-function varfromcounts(v::SVector{4,Int}, corrected::Bool, mn)
+function varfromcounts(v::AbstractVector{<:Integer}, corrected::Bool, mn)
     nnmiss = nnonmiss(v)
     if mn == nothing
         mn = (v[3] + 2v[4]) / nnmiss
@@ -121,7 +121,7 @@ function _var(f::BEDFile, corrected::Bool, mean, dims::Integer)
     end
 end
 
-function maffromcounts(v::SVector{4, Int})
+function maffromcounts(v::AbstractVector{<:Integer})
     freq = (v[3] + 2v[4]) / (2 * nnonmiss(v))
     freq ≤ 0.5 ? freq : 1 - freq
 end
@@ -137,7 +137,7 @@ By definition the minor allele frequency is between 0 and 0.5
 """
 maf(f::BEDFile) = maffromcounts.(f.sccounts)
 
-minorallelefromcounts(v::SVector{4, Int}) = v[1] > v[4]
+minorallelefromcounts(v::AbstractVector{<:Integer}) = v[1] > v[4]
 
 minorallele!(out::AbstractVector{Bool}, f::BEDFile) =
     map!(minorallelefromcounts, out, f.sccounts)

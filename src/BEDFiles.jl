@@ -3,7 +3,7 @@ __precompile__()
 module BEDFiles
     using LinearAlgebra, Mmap, OffsetArrays, SparseArrays, StaticArrays, Statistics, StatsBase
     export BEDFile, bedvals, counts, grm, maf, maf!, minorallele, minorallele!, 
-        mean, mean!, missingpos, missingrate, missingrate!, std, var
+        mean, mean!, missingpos, missingrate, missingrate!, std, var, newgrm
     
     
     include("bedfile.jl")
