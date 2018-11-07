@@ -21,7 +21,7 @@ function newgrm(f::BEDFile, tempm::AbstractMatrix{<:AbstractFloat};
     m == k || throw(DimensionMismatch("size(f, 1) ≠ size(tempm, 1)"))
     T = eltype(tempm)
     uvec = Vector{T}(undef, 4)
-    result = Matrix{T}(undef, (m, m))
+    result = zeros(T, (m, m))
     colinds = something(colinds, maffromcounts.(f.sccounts) .≥ mafthreshold)
     sccounts = f.sccounts
     ind = 1
@@ -37,10 +37,7 @@ function newgrm(f::BEDFile, tempm::AbstractMatrix{<:AbstractFloat};
             end
             ind += 1
         end
-        if ind > n && j < l
-            fill!(view(tempm, :, j:l), zero(T))
-        end
-        BLAS.syrk!('L', 'N', one(T), tempm, one(T), result)
+        BLAS.syrk!('L', 'N', one(T), j < l ? view(tempm, :, 1:j) : tempm, one(T), result)
     end
     result ./= 2n
     Symmetric(result, :L)
